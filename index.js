@@ -594,7 +594,7 @@ async function testPush() {
   const prefix = await storage.getItem('TEST_BRANCH_NAME_PREFIX')
 
   if (typeof prefix === 'undefined') {
-    console.error(`No prefix set for test branch name.\nPlease think of a unique prefix that will not clash with WIP test branch prefixes, as well as anyone else working in this repo. e.g. "test/braden-".\nYou can set the test branch prefix by running '${args.$0} config --test-branch-prefix="test/my-prefix-blah-"'`);
+    console.error(`No prefix set for test branch name.\nPlease think of a unique prefix that will not clash with WIP test branch prefixes, as well as anyone else working in this repo. e.g. "test/braden-".\nYou can set the test branch prefix by running:\n${args.$0} config --test-branch-prefix="test/my-prefix-blah-"`);
     process.exit(1);
   }
 
@@ -648,7 +648,7 @@ async function wipPush() {
   const prefix = await storage.getItem('WIP_BRANCH_NAME_PREFIX')
 
   if (typeof prefix === 'undefined') {
-    console.error(`No prefix set for WIP branch name.\nPlease think of a unique prefix that will not clash with normal test branch prefixes, as well as anyone else working in this repo. e.g. "test/braden-wip-".\nYou can set the test branch prefix by running '${args.$0} config --wip-branch-prefix="test/my-wip-prefix-blah-"'`);
+    console.error(`No prefix set for WIP branch name.\nPlease think of a unique prefix that will not clash with normal test branch prefixes, as well as anyone else working in this repo. e.g. "test/braden-wip-".\nYou can set the test branch prefix by running:\n${args.$0} config --wip-branch-prefix="test/my-wip-prefix-blah-"`);
     process.exit(1);
   }
 
