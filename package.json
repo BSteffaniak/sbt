@@ -1,8 +1,12 @@
 {
-  "name": "@campspot/aggregator-release-info",
+  "name": "single-branch-tools",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "bin": {
+    "sbt": "./index.js"
+  },
+  "preferGlobal": true,
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
