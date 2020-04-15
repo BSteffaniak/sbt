@@ -755,11 +755,11 @@ async function main() {
       () => command = 'test-push'
     )
     .command(
-      [`rebase-on-${branchName}`],
-      `Rebase current branch onto ${branchName} and fast-forward ${branchName} with new commits`,
+      [`rebase-on-main`],
+      `Rebase current branch onto the main branch (${branchName}) and fast-forward ${branchName} with new commits`,
       () => {
       },
-      () => command = `rebase-on-${branchName}`
+      () => command = `rebase-on-main`
     )
     .command(
       ['config'],
@@ -808,7 +808,7 @@ async function main() {
     case 'test-push':
       await testPush();
       break;
-    case `rebase-on-${branchName}`:
+    case `rebase-on-main`:
       await rebaseOnMaster();
       break;
     case 'config':
