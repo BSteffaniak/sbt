@@ -387,6 +387,50 @@ function storyIsObsolete(story) {
   return story.labels.some(label => label.kind === "label" && label.name === "obsolete");
 }
 
+function filterStoriesByWhereClause(stories, whereClause) {
+  filterFuncsForWhereClause(whereClause).forEach((func) => {
+    stories = stories.filter(story => func(story));
+  });
+
+  return stories;
+}
+
+function filterFuncsForWhereClause(whereClause) {
+  return whereClause.map((clause) => {
+    const commands = Object.keys(clause);
+
+    return commands.map((command) => {
+      const currentCommand = clause[command];
+      const properties = Object.entries(currentCommand);
+
+      switch (command) {
+        case "not":
+          return (x) => properties.every(([key, value]) => {
+            return !filterFuncsForWhereClause(value).every(y => y(x));
+          });
+        case "equals":
+          return (x) => properties.every(([key, value]) => {
+            return value === x[key];
+          });
+        case "includes":
+          return (x) => properties.every(([key, value]) => {
+            const data = x[key];
+
+            if (Array.isArray(data)) {
+              return data.some(d => value.includes(d));
+            } else {
+              return value.includes(data);
+            }
+          });
+        default:
+          console.error(`Invalid command '${command}'`);
+          process.exit(1);
+          break;
+      }
+    });
+  }).flat();
+}
+
 async function getReleaseInfo() {
   const uniquePivotalIds = await getUniquePivotalIds();
 
@@ -408,6 +452,8 @@ async function getReleaseInfo() {
     });
 
   allPivotalStories.forEach((story) => {
+    story.labelNames = story.labels.map(label => label.name);
+
     story.isConsumer = storyIsConsumer(story);
     story.isAggregator = storyIsAggregator(story);
     story.isSpike = storyIsSpike(story);
@@ -461,37 +507,34 @@ async function getReleaseInfo() {
       })
   );
 
-  printListOfStories(
-    "New Features",
-    features.filter(story => story.current_state === "accepted")
-  );
+  if (sbt.sections) {
+    sbt.sections.forEach((section) => {
+      let stories = storiesOnRelease;
 
-  printListOfStories(
-    "New Fixes",
-    bugs.filter(story => story.current_state === "accepted")
-  );
+      if (section.stories) {
+        switch (section.stories) {
+          case "all":
+            stories = allPivotalStories;
+            break;
+          default:
+            console.error(`Invalid stories value '${section.stories}'`);
+            process.exit(1);
+            break;
+        }
+      }
 
-  printListOfStories(
-    "Carry-over stories",
-    closedOutStories
-  );
+      const sectionStories = filterStoriesByWhereClause(stories, section.where);
 
-  printListOfStories(
-    "Consumer stories",
-    storiesOnRelease.filter(story => story.isConsumer)
-  );
+      if (section.attach) {
+        sectionStories.forEach(story => story[section.attach.key] = section.attach.value);
+      }
 
-  printListOfStories(
-    "Aggregator stories",
-    storiesOnRelease.filter(story => story.isAggregator)
-  );
-
-  printListOfStories(
-    numberOfStoriesPrinted > 0 ? "Other stories" : "All stories",
-    storiesOnRelease
-      .filter(story => !story.isConsumer)
-      .filter(story => !story.isAggregator)
-  );
+      printListOfStories(
+        section.header,
+        sectionStories
+      );
+    });
+  }
 
   printListOfStories(
     "Stories requiring code review",
