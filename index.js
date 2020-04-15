@@ -12,8 +12,9 @@ const roxApiKey = sbt.rox.apiKey;
 const roxAppKey = sbt.rox.appKey;
 const upsourceProjectName = sbt.upsourceProjectName;
 const pivotalTrackerToken = sbt.pivotal.trackerToken;
-const repoPath = sbt.repoPath || ".";
 const branchName = sbt.branchName || "master";
+
+let repoPath = sbt.repoPath || ".";
 
 const git = gitFunc(repoPath);
 
@@ -591,6 +592,10 @@ async function main() {
             alias: 's',
             type: 'number',
             description: 'Number of milliseconds to sleep between fetching info for pivotal stories'
+          })
+          .option('repo-path', {
+            type: 'string',
+            description: 'Path to git repo to pull version info from'
           });
       }, () => command = 'release'
     )
@@ -618,6 +623,8 @@ async function main() {
     console.error(`Invalid command. Run '${args.$0} --help' for help.`);
     process.exit(1);
   }
+
+  repoPath = args["repo-path"] || repoPath;
 
   switch (command) {
     case 'release':
