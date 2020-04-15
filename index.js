@@ -571,18 +571,18 @@ async function getReleaseInfo() {
   console.log(`[Commits with no attached review](${getAllUnattachedCommitsUpsourceUrl()})`);
 }
 
-function main() {
-  return new Promise((resolve, reject) => {
-    let releaseInfo = false
+async function main() {
+  let command;
 
-    const yargs = require('yargs');
+  const yargs = require('yargs');
 
-    args = yargs
-      .usage('Usage: $0 <command> [options]')
-      .command('release', 'Generate release info to stdout', () => {
-        releaseInfo = true
-
-        return yargs.option('no-duplicate-header', {
+  args = yargs
+    .usage('Usage: $0 <command> [options]')
+    .command(
+      ['$0', 'release'], 'Generate release info to stdout',
+      () => {
+        return yargs
+          .option('no-duplicate-header', {
             alias: 'no-dupes',
             type: 'boolean',
             description: 'Do not print duplicate stories that are being removed before the output'
@@ -592,23 +592,44 @@ function main() {
             type: 'number',
             description: 'Number of milliseconds to sleep between fetching info for pivotal stories'
           });
-      })
-      .example('$0 release', 'Generate release info to stdout')
-      .argv;
+      }, () => command = 'release'
+    )
+    .command(
+      ['wip-push', 'wp'],
+      'Push current staged and unstaged changes to wip git branch, but do not commit',
+      () => {
+      },
+      () => command = 'wip-push'
+    )
+    .command(
+      ['test-push', 'tp'],
+      'Push current committed changes to a test git branch',
+      () => {
+      },
+      () => command = 'test-push'
+    )
+    .example('$0 release', 'Generate release info to stdout');
 
-    releaseInfo = releaseInfo || args._.length === 0;
+  const commands = args.getCommandInstance().getCommands();
 
-    if (releaseInfo) {
-      getReleaseInfo().then(() => {
-        resolve();
-      }).catch((err) => {
-        reject(err);
-      });
-    } else {
-      console.log(`Invalid command. Run '${args.$0} --help' for help.`);
-      resolve();
-    }
-  });
+  args = args.argv;
+
+  if (!command || (args._[0] && !commands.includes(args._[0]))) {
+    console.error(`Invalid command. Run '${args.$0} --help' for help.`);
+    process.exit(1);
+  }
+
+  switch (command) {
+    case 'release':
+      await getReleaseInfo();
+      break;
+    case 'wip-push':
+      console.log("wip push");
+      break;
+    case 'test-push':
+      console.log("test push");
+      break;
+  }
 }
 
 main().then(() => {
