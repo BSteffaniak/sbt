@@ -8,8 +8,8 @@ const request = require("request");
 const Rox = require("rox-node");
 
 const pivotalProjectId = sbt.pivotal.projectId;
-const roxApiKey = sbt.roxApiKey;
-const roxAppKey = sbt.roxAppKey;
+const roxApiKey = sbt.rox.apiKey;
+const roxAppKey = sbt.rox.appKey;
 const upsourceProjectName = sbt.upsourceProjectName;
 const pivotalTrackerToken = sbt.pivotal.trackerToken;
 const repoPath = sbt.repoPath || ".";
