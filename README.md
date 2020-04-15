@@ -1,17 +1,21 @@
-# Local Installation
+# Single Branch Tools
+
+## Local Installation
 
 1. `npm install -g .`
 
-# Upgrading versions
+## Upgrading versions
 
 1. `npm uninstall -g .`
 1. `git pull`
 1. `npm install -g .`
 
-# Usage
+## Usage
 (Run `sbt --help` after installation to see full docs)
 
-### `sbt`
+_These commands must be ran from within a directory containing a sbt.json file._
+
+#### `sbt`
 ```
 Usage: sbt <command> [options]
  
@@ -40,7 +44,7 @@ Usage: sbt <command> [options]
 ```
 ---
 
-### `sbt release`
+#### `sbt release`
 ```
 Generate release info to stdout
 
@@ -56,7 +60,7 @@ Options:
 ```
 ---
 
-### `sbt wip-push` (`sbt wp`)
+#### `sbt wip-push` (`sbt wp`)
 ```
 Push current staged and unstaged changes to wip git branch, but do not commit
 
@@ -66,7 +70,7 @@ Options:
 ```
 ---
 
-### `sbt test-push` (`sbt tp`)
+#### `sbt test-push` (`sbt tp`)
 ```
 Push current committed changes to a test git branch
 
@@ -78,7 +82,7 @@ Options:
 ```
 ---
 
-### `sbt rebase-on-${branchName}` (depending on branchName in sbt.json, `sbt rebase-on-master`, for example)
+#### `sbt rebase-on-${branchName}` (depending on branchName in sbt.json, `sbt rebase-on-master`, for example)
 ```
 sbt rebase-on-master
 
@@ -90,7 +94,7 @@ Options:
 ```
 ---
 
-### `sbt config` (If no arguments are passed to the options, the value is returned from storage)
+#### `sbt config` (If no arguments are passed to the options, the value is returned from storage)
 Example: `sbt config --wip-branch-id=199` to set wip branch id
 Example: `sbt config --wip-branch-id` to get wip branch id
 ```
