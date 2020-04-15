@@ -21,29 +21,24 @@ _These commands must be ran from within a directory containing a sbt.json file._
 #### `sbt`
 ```
 Usage: sbt <command> [options]
- 
- Commands:
-   sbt release           Generate release info to stdout                [default]
-   sbt wip-push          Push current staged and unstaged changes to wip git
-                         branch, but do not commit                  [aliases: wp]
-   sbt test-push         Push current committed changes to a test git branch
-                                                                    [aliases: tp]
-   sbt rebase-on-main    Rebase the main branch and fast-forward the main 
-                         branch with new commits7
-   sbt config            Configure settings for current environment and storage
- 
- Options:
-   --help                             Show help                         [boolean]
-   --version                          Show version number               [boolean]
-   --no-duplicate-header, --no-dupes  Do not print duplicate stories that are
-                                      being removed before the output   [boolean]
-   --sleep, -s                        Number of milliseconds to sleep between
-                                      fetching info for pivotal stories  [number]
-   --repo-path                        Path to git repo to pull version info from
-                                                                         [string]
- 
- Examples:
-   sbt release  Generate release info to stdout
+
+Commands:
+  sbt release         Generate release info to stdout
+  sbt wip-push        Push current staged and unstaged changes to wip git
+                      branch, but do not commit                    [aliases: wp]
+  sbt test-push       Push current committed changes to a test git branch
+                                                                   [aliases: tp]
+  sbt rebase-on-main  Rebase current branch onto the main branch and
+                      fast-forward the main branch with new commits
+  sbt config          Configure settings for current environment and storage
+
+Options:
+  --help     Show help                                                 [boolean]
+  --version  Show version number                                       [boolean]
+
+Examples:
+  sbt release  Generate release info to stdout
+
 ```
 ---
 

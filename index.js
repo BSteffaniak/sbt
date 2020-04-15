@@ -759,7 +759,7 @@ async function main() {
   args = yargs
     .usage('Usage: $0 <command> [options]')
     .command(
-      ['$0', 'release'], 'Generate release info to stdout',
+      ['release'], 'Generate release info to stdout',
       () => {
         return yargs
           .option('no-duplicate-header', {
