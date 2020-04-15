@@ -60,7 +60,8 @@ Options:
 ```
 ---
 
-#### `sbt wip-push` (`sbt wp`)
+#### `sbt wip-push`
+(`sbt wp`)
 ```
 Push current staged and unstaged changes to wip git branch, but do not commit
 
@@ -70,7 +71,8 @@ Options:
 ```
 ---
 
-#### `sbt test-push` (`sbt tp`)
+#### `sbt test-push`
+(`sbt tp`)
 ```
 Push current committed changes to a test git branch
 
@@ -94,7 +96,8 @@ Options:
 ```
 ---
 
-#### `sbt config` (If no arguments are passed to the options, the value is returned from storage)
+#### `sbt config`
+_If no arguments are passed to the options, the value is returned from storage_
 Example: `sbt config --wip-branch-id=199` to set wip branch id
 Example: `sbt config --wip-branch-id` to get wip branch id
 ```
