@@ -645,7 +645,10 @@ async function testPush() {
       runCommand('git', [`stash`]);
     }
 
-    runCommand('git', [`pull`]);
+    if (args.pull !== false) {
+      runCommand('git', [`pull`]);
+    }
+
     runCommand('git', [`checkout`, `-b`, `${prefix}${branchId}`]);
     runCommand('git', [`push`]);
     runCommand('git', [`checkout`, branchName]);
@@ -793,6 +796,10 @@ async function main() {
           .option('stash', {
             type: 'boolean',
             description: 'Stash changes before pushing test branch, and unstash them after pushing'
+          })
+          .option(`no-pull`, {
+            type: 'boolean',
+            description: `Do not pull changes from origin/${branchName} before creating test branch`
           });
       },
       () => command = 'test-push'

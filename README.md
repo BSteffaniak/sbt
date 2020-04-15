@@ -79,6 +79,8 @@ Options:
   --version  Show version number                                       [boolean]
   --stash    Stash changes before pushing test branch, and unstash them after
              pushing                                                   [boolean]
+  --no-pull  Do not pull changes from origin/master before creating test branch
+                                                                       [boolean]
 ```
 ---
 
