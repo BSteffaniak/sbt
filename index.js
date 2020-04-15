@@ -1,15 +1,20 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const sbt = JSON.parse(fs.readFileSync(`${process.cwd()}/sbt.json`, 'utf8'));
+
 const gitFunc = require("simple-git/promise");
 const request = require("request");
 const Rox = require("rox-node");
 
-const paymentServiceProjectId = 0;
-const roxApiKey = "";
-const roxAppKey = "";
-const upsourceProjectName = "";
-const pivotalTrackerToken = "";
-const repoLocation = "";
+const pivotalProjectId = sbt.pivotalProjectId;
+const roxApiKey = sbt.roxApiKey;
+const roxAppKey = sbt.roxAppKey;
+const upsourceProjectName = sbt.upsourceProjectName;
+const pivotalTrackerToken = sbt.pivotalTrackerToken;
+const repoPath = sbt.repoPath;
 
-const git = gitFunc(repoLocation);
+const git = gitFunc(repoPath);
 
 let numberOfStoriesPrinted = 0;
 let previousReleaseDate = null;
@@ -20,11 +25,14 @@ async function sleep(ms) {
 }
 
 async function getCommitMessages() {
-  const previousReleaseCommitLogs = [
-    // await git.log({from: "HEAD", to: "HEAD"}), // my release name
-  ];
+  const pastReleases = sbt.releases.slice(0, sbt.releases.length - 1);
+  const currentRelease = sbt.releases[sbt.releases.length - 1];
 
-  const releaseCommits = await git.log({from: "HEAD", to: "HEAD"}); // my release name
+  const previousReleaseCommitLogs = await Promise.all(
+    pastReleases.map(release => git.log({from: release.from, to: release.to}))
+  );
+
+  const releaseCommits = await git.log({from: currentRelease.from, to: currentRelease.to});
   const lastRelease = previousReleaseCommitLogs[previousReleaseCommitLogs.length - 1];
 
   let dedupedCommits = releaseCommits.all;
@@ -128,7 +136,7 @@ async function getStoriesAcceptedAfterPreviousRelease() {
     return [];
   }
 
-  return await pivotalApiGetRequest(`https://www.pivotaltracker.com/services/v5/projects/${paymentServiceProjectId}/stories?accepted_after=${previousReleaseDate.valueOf()}`);
+  return await pivotalApiGetRequest(`https://www.pivotaltracker.com/services/v5/projects/${pivotalProjectId}/stories?accepted_after=${previousReleaseDate.valueOf()}`);
 }
 
 async function pivotalApiGetRequest(url) {
@@ -226,8 +234,8 @@ async function attachReviewInfoToStories(stories) {
       story.reviews = [];
     }
 
-    story.codeReviews = story.reviews.filter(review => review.review_type_id === 7604 || review.review_type_id === 4628937 || review.review_type_id === 4165914 || review.review_type_id === 618);
-    story.qaReviews = story.reviews.filter(review => review.review_type_id === 7602 || review.review_type_id === 4628939 || review.review_type_id === 4165912 || review.review_type_id === 616);
+    story.codeReviews = story.reviews.filter(review => review.review_type_id === 7604 || review.review_type_id === 4628937 || review.review_type_id === 4165914 || review.review_type_id === 618 || review.review_type_id === 342 || review.review_type_id === 5340178);
+    story.qaReviews = story.reviews.filter(review => review.review_type_id === 7602 || review.review_type_id === 4628939 || review.review_type_id === 4165912 || review.review_type_id === 616 || review.review_type_id === 340);
     story.designReviews = story.reviews.filter(review => review.review_type_id === 7603 || review.review_type_id === 617);
     story.featureFlagReviews = story.reviews.filter(review => review.review_type_id === 5527847 || review.review_type_id === 5675322);
 
