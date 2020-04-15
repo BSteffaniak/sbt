@@ -21,6 +21,8 @@ let numberOfStoriesPrinted = 0;
 let previousReleaseDate = null;
 let currentReleaseDate = null;
 
+let args;
+
 async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -61,7 +63,7 @@ async function getCommitMessages() {
       }
     });
 
-    if (duplicateCommits.length > 0) {
+    if (duplicateCommits.length > 0 && args.dupes !== false) {
       console.warn("Removing some duplicate commits:");
       console.warn(duplicateCommits.map(commit => commit.message).join("\n"));
       console.warn("\n\n\n\n");
@@ -567,6 +569,36 @@ async function getReleaseInfo() {
   console.log(`[Commits with no attached review](${getAllUnattachedCommitsUpsourceUrl()})`);
 }
 
-getReleaseInfo().then(() => {
+function main() {
+  return new Promise((resolve, reject) => {
+    let releaseInfo = false
+
+    args = require('yargs')
+      .usage('Usage: $0 <command> [options]')
+      .command('release', 'Generate release info to stdout', () => releaseInfo = true)
+      .option('no-duplicate-header', {
+        alias: 'no-dupes',
+        type: 'boolean',
+        description: 'Do not print duplicate stories that are being removed before the output'
+      })
+      .example('$0 release', 'Generate release info to stdout')
+      .argv;
+
+    releaseInfo = releaseInfo || args._.length === 0;
+
+    if (releaseInfo) {
+      getReleaseInfo().then(() => {
+        resolve();
+      }).catch((err) => {
+        reject(err);
+      });
+    } else {
+      console.log(`Invalid command. Run '${args.$0} --help' for help.`);
+      resolve();
+    }
+  });
+}
+
+main().then(() => {
   process.exit();
 });
