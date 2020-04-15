@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
+const storage = require('node-persist');
 const fs = require('fs');
+
+const {spawnSync} = require('child_process');
+
 const sbt = JSON.parse(fs.readFileSync(`${process.cwd()}/sbt.json`, 'utf8'));
 
 const gitFunc = require("simple-git/promise");
@@ -572,7 +576,139 @@ async function getReleaseInfo() {
   console.log(`[Commits with no attached review](${getAllUnattachedCommitsUpsourceUrl()})`);
 }
 
+function runCommand(command, options) {
+  const resp = spawnSync(
+    command,
+    options,
+    {
+      stdio: [null, process.stdout, process.stderr]
+    }
+  );
+
+  if (resp.status !== 0) {
+    throw new Error(String(resp.output));
+  }
+}
+
+async function testPush() {
+  const prefix = await storage.getItem('TEST_BRANCH_NAME_PREFIX')
+
+  if (typeof prefix === 'undefined') {
+    console.error(`No prefix set for test branch name.\nPlease think of a unique prefix that will not clash with WIP test branch prefixes, as well as anyone else working in this repo. e.g. "test/braden-".\nYou can set the test branch prefix by running '${args.$0} config --test-branch-prefix="test/my-prefix-blah-"'`);
+    process.exit(1);
+  }
+
+  let branchId;
+
+  try {
+    const currentBranchIdValue = parseInt(await storage.getItem('BRANCH_ID'));
+
+    branchId = (currentBranchIdValue || 0) + 1;
+
+    await storage.setItem('BRANCH_ID', branchId);
+
+    if (args.stash) {
+      runCommand('git', [`add`, `.`]);
+      runCommand('git', [`stash`]);
+    }
+
+    runCommand('git', [`pull`]);
+    runCommand('git', [`checkout`, `-b`, `${prefix}${branchId}`]);
+    runCommand('git', [`push`]);
+    runCommand('git', [`checkout`, branchName]);
+
+    if (args.stash) {
+      runCommand('git', [`stash`, `pop`]);
+    }
+  } catch (e) {
+    console.error("Failed to test push");
+    process.exit(1);
+  }
+
+  console.log(`Successfully pushed test branch to: ${prefix}${branchId}`)
+}
+
+async function rebaseOnMaster() {
+  try {
+    runCommand('git', [`checkout`, branchName]);
+    runCommand('git', [`pull`]);
+    runCommand('git', [`checkout`, `@{-1}`]);
+    runCommand('git', [`rebase`, branchName]);
+    runCommand('git', [`checkout`, branchName]);
+    runCommand('git', [`merge`, `@{-1}`]);
+  } catch (e) {
+    console.error(`Failed to rebase on ${branchName}`);
+    process.exit(1);
+  }
+
+  console.log(`Successfully rebased on ${branchName}`)
+}
+
+async function wipPush() {
+  const prefix = await storage.getItem('WIP_BRANCH_NAME_PREFIX')
+
+  if (typeof prefix === 'undefined') {
+    console.error(`No prefix set for WIP branch name.\nPlease think of a unique prefix that will not clash with normal test branch prefixes, as well as anyone else working in this repo. e.g. "test/braden-wip-".\nYou can set the test branch prefix by running '${args.$0} config --wip-branch-prefix="test/my-wip-prefix-blah-"'`);
+    process.exit(1);
+  }
+
+  let branchId;
+
+  try {
+    const currentBranchIdValue = parseInt(await storage.getItem('WIP_BRANCH_ID'));
+
+    branchId = (currentBranchIdValue || 0) + 1;
+
+    await storage.setItem('WIP_BRANCH_ID', branchId);
+
+    runCommand('git', [`checkout`, `-b`, `${prefix}${branchId}`]);
+    runCommand('git', [`add`, `.`]);
+    runCommand('git', [`commit`, `-m`, `WIP test branch progress`]);
+    runCommand('git', [`push`]);
+    runCommand('git', [`reset`, `HEAD~`]);
+    runCommand('git', [`checkout`, branchName]);
+  } catch (e) {
+    console.error("Failed to WIP push");
+    process.exit(1);
+  }
+
+  console.log(`Successfully pushed WIP branch to: ${prefix}${branchId}`)
+}
+
+async function config() {
+  if (args.hasOwnProperty("branchId")) {
+    if (typeof args.branchId === 'undefined') {
+      console.log(await storage.getItem("BRANCH_ID"))
+    } else {
+      await storage.setItem("BRANCH_ID", args.branchId);
+    }
+  }
+  if (args.hasOwnProperty("wipBranchId")) {
+    if (typeof args.wipBranchId === 'undefined') {
+      console.log(await storage.getItem("WIP_BRANCH_ID"))
+    } else {
+      await storage.setItem("WIP_BRANCH_ID", args.wipBranchId);
+    }
+  }
+  if (args.hasOwnProperty("testBranchPrefix")) {
+    if (!args.testBranchPrefix) {
+      console.log(await storage.getItem("TEST_BRANCH_NAME_PREFIX"))
+    } else {
+      await storage.setItem("TEST_BRANCH_NAME_PREFIX", args.testBranchPrefix);
+    }
+  }
+  if (args.hasOwnProperty("wipBranchPrefix")) {
+    if (!args.wipBranchPrefix) {
+      console.log(await storage.getItem("WIP_BRANCH_NAME_PREFIX"))
+    } else {
+      await storage.setItem("WIP_BRANCH_NAME_PREFIX", args.wipBranchPrefix);
+    }
+  }
+}
+
 async function main() {
+  await storage.init();
+
   let command;
 
   const yargs = require('yargs');
@@ -610,8 +746,44 @@ async function main() {
       ['test-push', 'tp'],
       'Push current committed changes to a test git branch',
       () => {
+        return yargs
+          .option('stash', {
+            type: 'boolean',
+            description: 'Stash changes before pushing test branch, and unstash them after pushing'
+          });
       },
       () => command = 'test-push'
+    )
+    .command(
+      [`rebase-on-${branchName}`],
+      `Rebase current branch onto ${branchName} and fast-forward ${branchName} with new commits`,
+      () => {
+      },
+      () => command = `rebase-on-${branchName}`
+    )
+    .command(
+      ['config'],
+      'Configure settings for current environment and storage',
+      () => {
+        return yargs
+          .option('branch-id', {
+            type: 'number',
+            description: 'ID of the most recently published test branch'
+          })
+          .option('wip-branch-id', {
+            type: 'number',
+            description: 'ID of the most recently published WIP branch'
+          })
+          .option('test-branch-prefix', {
+            type: 'string',
+            description: 'Prefix for branch names generated from test pushes'
+          })
+          .option('wip-branch-prefix', {
+            type: 'string',
+            description: 'Prefix for branch names generated from WIP pushes'
+          });
+      },
+      () => command = 'config'
     )
     .example('$0 release', 'Generate release info to stdout');
 
@@ -631,10 +803,16 @@ async function main() {
       await getReleaseInfo();
       break;
     case 'wip-push':
-      console.log("wip push");
+      await wipPush();
       break;
     case 'test-push':
-      console.log("test push");
+      await testPush();
+      break;
+    case `rebase-on-${branchName}`:
+      await rebaseOnMaster();
+      break;
+    case 'config':
+      await config();
       break;
   }
 }
