@@ -84,7 +84,8 @@ Options:
 ```
 ---
 
-#### `sbt rebase-on-${branchName}` (depending on branchName in sbt.json, `sbt rebase-on-master`, for example)
+#### `sbt rebase-on-${branchName}`
+_depending on branchName in sbt.json, `sbt rebase-on-master`, for example_
 ```
 sbt rebase-on-master
 
