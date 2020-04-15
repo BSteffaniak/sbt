@@ -84,12 +84,11 @@ Options:
 ```
 ---
 
-#### `sbt rebase-on-${branchName}`
-_depending on branchName in sbt.json, `sbt rebase-on-master`, for example_
+#### `sbt rebase-on-main`
 ```
-sbt rebase-on-master
+sbt rebase-on-main
 
-Rebase current branch onto master and fast-forward master with new commits
+Rebase current branch onto the main branch and fast-forward the main branch with new commits
 
 Options:
   --help     Show help                                                 [boolean]
