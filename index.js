@@ -460,8 +460,6 @@ async function getReleaseInfo() {
     story.isObsolete = storyIsObsolete(story);
   });
 
-  const closedOutStories = allPivotalStories.filter(story => storyIsClosedOutAndCarriedOver(story));
-
   const pivotalStories = allPivotalStories
     .filter(story => !storyIsClosedOutAndCarriedOver(story))
     .filter(story => !story.isObsolete);
