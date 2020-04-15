@@ -227,7 +227,9 @@ function printListOfStories(header, stories, options = {}) {
 
 async function attachReviewInfoToStories(stories) {
   return await Promise.all(stories.map(async (story, i) => {
-    // await sleep(5000 * i);
+    if (args.sleep > 0) {
+      await sleep(args.sleep * i);
+    }
 
     story.reviews = await pivotalApiGetRequest(`https://www.pivotaltracker.com/services/v5/projects/${story.project_id}/stories/${story.id}/reviews`);
 
@@ -580,6 +582,11 @@ function main() {
         alias: 'no-dupes',
         type: 'boolean',
         description: 'Do not print duplicate stories that are being removed before the output'
+      })
+      .option('sleep', {
+        alias: 's',
+        type: 'number',
+        description: 'Number of milliseconds to sleep between fetching info for pivotal stories'
       })
       .example('$0 release', 'Generate release info to stdout')
       .argv;
