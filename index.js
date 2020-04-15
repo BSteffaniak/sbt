@@ -1,0 +1,522 @@
+const gitFunc = require("simple-git/promise");
+const request = require("request");
+const Rox = require("rox-node");
+
+const paymentServiceProjectId = 0;
+const roxApiKey = "";
+const roxAppKey = "";
+const upsourceProjectName = "";
+const pivotalTrackerToken = "";
+const repoLocation = "";
+
+const git = gitFunc(repoLocation);
+
+let numberOfStoriesPrinted = 0;
+let previousReleaseDate = null;
+let currentReleaseDate = null;
+
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function getCommitMessages() {
+  const previousReleaseCommitLogs = [
+    // await git.log({from: "HEAD", to: "HEAD"}), // my release name
+  ];
+
+  const releaseCommits = await git.log({from: "HEAD", to: "HEAD"}); // my release name
+  const lastRelease = previousReleaseCommitLogs[previousReleaseCommitLogs.length - 1];
+
+  let dedupedCommits = releaseCommits.all;
+
+  if (lastRelease) {
+    previousReleaseDate = Date.parse(lastRelease.latest.date);
+    currentReleaseDate = Date.parse(releaseCommits.all[releaseCommits.total - 1].date);
+
+    const allPreviousReleaseCommits = previousReleaseCommitLogs.flatMap(commits => commits.all);
+    const allPreviousReleaseCommitsMap = {};
+
+    allPreviousReleaseCommits.forEach((commit) => {
+      allPreviousReleaseCommitsMap[commit.date + commit.message] = true;
+    });
+
+    const duplicateCommits = [];
+
+    dedupedCommits = dedupedCommits.filter((commit) => {
+      if (allPreviousReleaseCommitsMap[commit.date + commit.message]) {
+        duplicateCommits.push(commit);
+
+        return false;
+      } else {
+        return true;
+      }
+    });
+
+    if (duplicateCommits.length > 0) {
+      console.warn("Removing some duplicate commits:");
+      console.warn(duplicateCommits.map(commit => commit.message).join("\n"));
+      console.warn("\n\n\n\n");
+    }
+  }
+
+  return dedupedCommits.map(commit => commit.message);
+}
+
+async function getUniquePivotalIds() {
+  const messages = await getCommitMessages();
+
+  const allPivotalIds = messages
+    .map(message => /(^|\s+)\[#?(\d+)/g.exec(message))
+    .filter(groups => groups && groups.length > 2)
+    .map(groups => groups[2]);
+
+  const uniquePivotalIdsMap = {};
+
+  allPivotalIds.forEach(id => uniquePivotalIdsMap[id] = true);
+
+  return Object.keys(uniquePivotalIdsMap);
+}
+
+function getFeatureFlagData(story) {
+  if (!story.description) {
+    return [];
+  }
+
+  const featureFlagNameMatches = [...story.description.matchAll(/(^|[^\w.?/])([a-z]\w+\.[a-z]\w+)([^\w.?/]|$)/gm)];
+
+  return featureFlagNameMatches
+    .filter(match => match)
+    .filter(match => match.length >= 3)
+    .filter(match => !!match[2])
+    .map((match) => {
+      const fullFeatureFlagName = match[2];
+
+      const fullNameComponents = fullFeatureFlagName.split(/\./);
+
+      const container = fullNameComponents[0];
+      const name = fullNameComponents[1];
+
+      return {
+        fullName: fullFeatureFlagName,
+        fullNameComponents: fullNameComponents,
+        container: container,
+        name: name,
+        url: `https://app.rollout.io/app/${roxAppKey}/flags?filter=${fullFeatureFlagName}`
+      };
+    })
+    .filter(flagData => !/^(js|ts|png|gradle|io|kt|java|hooksPath)$/gi.test(flagData.name));
+}
+
+function getAllUnclosedReviewsUpsourceUrl(pivotalIds) {
+  return getUpsourceUrl(`branch: development and not #{closed review} and (${pivotalIds.join(" or ")})`);
+}
+
+function getAllUnattachedCommitsUpsourceUrl() {
+  return getUpsourceUrl(`branch: development and not #{closed review} and not #{open review}`);
+}
+
+function getStoryReviewsUpsourceUrl(story) {
+  return getUpsourceUrl(`branch: development and ${story.id}`);
+}
+
+function getUpsourceUrl(query) {
+  return `https://upsource.campspot.com/${upsourceProjectName}?query=${encodeURIComponent(query).replace(/\(/, "%28").replace(/\)/, "%29")}`;
+}
+
+async function getStoriesAcceptedAfterPreviousRelease() {
+  if (!previousReleaseDate) {
+    return [];
+  }
+
+  return await pivotalApiGetRequest(`https://www.pivotaltracker.com/services/v5/projects/${paymentServiceProjectId}/stories?accepted_after=${previousReleaseDate.valueOf()}`);
+}
+
+async function pivotalApiGetRequest(url) {
+  const requestOptions = {
+    uri: url,
+    method: 'GET',
+    headers: {
+      accept: 'application/json',
+      "X-TrackerToken": pivotalTrackerToken
+    }
+  };
+
+  return await new Promise((resolve) => {
+    request(requestOptions, (err, response, body) => {
+      if (body) {
+        resolve(JSON.parse(body));
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
+function getStoryDisplayIndex(story) {
+  switch (story.story_type) {
+    case "feature":
+      return 1;
+    case "bug":
+      return 2;
+    case "chore":
+      return 3;
+  }
+}
+
+function sortStoryFunction(a, b) {
+  return getStoryDisplayIndex(a) - getStoryDisplayIndex(b);
+}
+
+function printStoryInfo(story, options = {}) {
+  let flagText = ``;
+
+  if (story.hasFeatureFlagReviews) {
+    if (story.flags.length > 0) {
+      flagText = story.flags
+        .map(flag => `[Flag (${flag.enabled ? 'on' : 'off'})](${flag.url})`)
+        .join(" ");
+    } else {
+      flagText = `(description missing flag)`;
+    }
+  } else {
+    flagText = `(no flags)`;
+  }
+
+  let upsourceLink = ``;
+
+  if (story.requiresCodeReview) {
+    upsourceLink = `[Upsource](${getStoryReviewsUpsourceUrl(story)})`;
+  }
+
+  const components = [
+    `#${story.id} [${story.story_type}] ${story.name.trim()}`,
+    flagText,
+    options.printUpsource ? upsourceLink : ''
+  ];
+
+  const storyInfo = components
+    .filter(str => !!str)
+    .join(" ");
+
+  console.log(storyInfo);
+
+  numberOfStoriesPrinted++;
+}
+
+function printListOfStories(header, stories, options = {}) {
+  if (stories.length > 0) {
+    stories.sort(sortStoryFunction);
+
+    console.log(`&nbsp;\n&nbsp;\n&nbsp;`);
+    console.log(`# ${header}:\n`);
+
+    stories.forEach((story) => printStoryInfo(story, options));
+  }
+}
+
+async function attachReviewInfoToStories(stories) {
+  return await Promise.all(stories.map(async (story, i) => {
+    // await sleep(5000 * i);
+
+    story.reviews = await pivotalApiGetRequest(`https://www.pivotaltracker.com/services/v5/projects/${story.project_id}/stories/${story.id}/reviews`);
+
+    if (story.reviews && Array.isArray(story.reviews)) {
+      story.reviews = story.reviews.filter(review => review.kind === "review");
+    } else {
+      story.reviews = [];
+    }
+
+    story.codeReviews = story.reviews.filter(review => review.review_type_id === 7604 || review.review_type_id === 4628937 || review.review_type_id === 4165914 || review.review_type_id === 618);
+    story.qaReviews = story.reviews.filter(review => review.review_type_id === 7602 || review.review_type_id === 4628939 || review.review_type_id === 4165912 || review.review_type_id === 616);
+    story.designReviews = story.reviews.filter(review => review.review_type_id === 7603 || review.review_type_id === 617);
+    story.featureFlagReviews = story.reviews.filter(review => review.review_type_id === 5527847 || review.review_type_id === 5675322);
+
+    story.requiresCodeReview = story.codeReviews.length === 0 || story.codeReviews.some(review => review.status !== "pass");
+    story.requiresDesignReview = story.designReviews.some(review => review.status !== "pass");
+    story.requiresQAReview = (((story.story_type === "feature" && !story.isSpike) || story.story_type === "bug") && story.qaReviews.length === 0) || story.qaReviews.some(review => review.status !== "pass");
+
+    story.hasFeatureFlagReviews = story.featureFlagReviews.length > 0;
+    story.requiresFeatureFlagReview = story.featureFlagReviews.some(review => review.status !== "pass");
+    story.passesFeatureFlagReview = story.hasFeatureFlagReviews && story.featureFlagReviews.every(review => review.status === "pass");
+  }));
+}
+
+async function attachBlockersToStories(stories) {
+  await Promise.all(stories.filter(story => !story.blockers).map(async (story) => {
+    story.blockers = await pivotalApiGetRequest(`https://www.pivotaltracker.com/services/v5/projects/${story.project_id}/stories/${story.id}/blockers`);
+
+    if (!Array.isArray(story.blockers)) {
+      story.blockers = [];
+    } else {
+      story.blockers
+        .filter(blocker => blocker.description.startsWith("#"))
+        .forEach((blocker) => {
+          blocker.storyIdFromDescription = parseInt(blocker.description.substr(1).trim());
+        });
+    }
+  }));
+
+  await addMissingStoriesFromBlockers(stories);
+}
+
+async function addMissingStoriesFromBlockers(stories) {
+  const blockerStoryIds = {};
+  const existingStoryIds = {};
+
+  stories.forEach((story) => {
+    existingStoryIds[story.id] = true;
+  });
+
+  stories.forEach((story) => {
+    story.blockers
+      .filter(blocker => blocker.storyIdFromDescription)
+      .filter(blocker => !existingStoryIds[blocker.storyIdFromDescription])
+      .forEach(blocker => blockerStoryIds[blocker.storyIdFromDescription] = true);
+  });
+
+  const newStoryIds = Object.keys(blockerStoryIds);
+
+  let newStories = await Promise.all(newStoryIds.map(async (storyId) => {
+    return await pivotalApiGetRequest(`https://www.pivotaltracker.com/services/v5/stories/${storyId}`);
+  }));
+
+  newStories = newStories
+    .filter(story => story !== null)
+    .filter(story => story.kind === "story");
+
+  newStories.forEach((story) => {
+    story.transient = true;
+
+    stories.push(story);
+  });
+
+  if (newStories.length > 0) {
+    await attachBlockersToStories(stories);
+  } else {
+    stories.forEach((story) => {
+      story.blockers = story.blockers.map((blocker) => {
+        return stories.find(s => s.id == blocker.storyIdFromDescription) || blocker;
+      });
+    });
+  }
+}
+
+async function attachRolloutInfoToStories(stories) {
+  await Rox.setup(roxApiKey);
+
+  const containers = {};
+
+  stories.forEach((story) => {
+    story.flags = story.hasFeatureFlagReviews ? story.flags : [];
+
+    story.flags.forEach((flag) => {
+      if (!containers[flag.container]) {
+        containers[flag.container] = {};
+      }
+      if (!containers[flag.container][flag.name]) {
+        containers[flag.container][flag.name] = new Rox.Flag();
+      }
+    });
+  });
+
+  await Promise.all(
+    Object.keys(containers)
+      .map((containerName) => {
+        const containerValue = containers[containerName];
+
+        return Rox.register(containerName, containerValue);
+      })
+  );
+
+  stories.forEach((story) => {
+    story.flags.forEach((flag) => {
+      flag.rollout = {
+        container: containers[flag.container],
+        flag: containers[flag.container][flag.name]
+      };
+
+      flag.enabled = flag.rollout.flag.isEnabled();
+    });
+  });
+}
+
+function attachFlagInfoToStories(stories) {
+  stories.forEach((story) => {
+    story.flags = getFeatureFlagData(story);
+  });
+
+  return stories;
+}
+
+function countEstimateSum(stories) {
+  return stories.reduce((a, b) => {
+    if (!isNaN(a.estimate)) {
+      return a.estimate + (b.estimate || 0);
+    } else {
+      return (a || 0) + (b.estimate || 0)
+    }
+  }, 0);
+}
+
+function storyIsClosedOutAndCarriedOver(story) {
+  return story.labels.some(label => label.kind === "label" && label.name === "close out and carry over");
+}
+
+function storyIsConsumer(story) {
+  return story.labels.some(label => label.kind === "label" && (label.name === "new consumer" || label.name === "consumer"));
+}
+
+function storyIsAggregator(story) {
+  return story.labels.some(label => label.kind === "label" && (label.name === "prototype" || label.name === "aggregator"));
+}
+
+function storyIsSpike(story) {
+  return story.labels.some(label => label.kind === "label" && label.name === "spike");
+}
+
+function storyIsObsolete(story) {
+  return story.labels.some(label => label.kind === "label" && label.name === "obsolete");
+}
+
+async function getReleaseInfo() {
+  const uniquePivotalIds = await getUniquePivotalIds();
+
+  const pivotalStoriesIncludingNull = await Promise.all(uniquePivotalIds.map((id) => {
+    return pivotalApiGetRequest(`https://www.pivotaltracker.com/services/v5/stories/${id}`);
+  }));
+
+  const allPivotalStories = pivotalStoriesIncludingNull
+    .filter(story => story !== null)
+    .filter(story => story.kind === "story");
+
+  const storiesAcceptedAfterPreviousRelease = await getStoriesAcceptedAfterPreviousRelease();
+
+  storiesAcceptedAfterPreviousRelease
+    .filter(story => allPivotalStories.every(s => s.id !== story.id))
+    .filter(story => Date.parse(story.accepted_at) >= currentReleaseDate)
+    .forEach((story) => {
+      allPivotalStories.push(story);
+    });
+
+  allPivotalStories.forEach((story) => {
+    story.isConsumer = storyIsConsumer(story);
+    story.isAggregator = storyIsAggregator(story);
+    story.isSpike = storyIsSpike(story);
+    story.isObsolete = storyIsObsolete(story);
+  });
+
+  const closedOutStories = allPivotalStories.filter(story => storyIsClosedOutAndCarriedOver(story));
+
+  const pivotalStories = allPivotalStories
+    .filter(story => !storyIsClosedOutAndCarriedOver(story))
+    .filter(story => !story.isObsolete);
+
+  await attachBlockersToStories(pivotalStories);
+
+  attachFlagInfoToStories(pivotalStories);
+
+  await attachReviewInfoToStories(pivotalStories);
+  await attachRolloutInfoToStories(pivotalStories);
+
+  const storiesOnRelease = pivotalStories.filter(story => !story.transient);
+
+  const features = storiesOnRelease.filter(story => story.story_type === "feature");
+  const chores = storiesOnRelease.filter(story => story.story_type === "chore");
+  const bugs = storiesOnRelease.filter(story => story.story_type === "bug");
+
+  const featureEstimationSum = countEstimateSum(features);
+  const choreEstimationSum = countEstimateSum(chores);
+  const bugEstimationSum = countEstimateSum(bugs);
+
+  console.log(`${features.length} Feature${features.length === 1 ? '' : 's'} (${featureEstimationSum} point${featureEstimationSum === 1 ? '' : 's'})`);
+  console.log(`${chores.length} Chore${chores.length === 1 ? '' : 's'} (${choreEstimationSum} point${choreEstimationSum === 1 ? '' : 's'})`);
+  console.log(`${bugs.length} Bug${bugs.length === 1 ? '' : 's'} (${bugEstimationSum} point${bugEstimationSum === 1 ? '' : 's'})`);
+
+  printListOfStories(
+    "Stories to have flags turned on",
+    pivotalStories
+      .filter(story => story.current_state === "accepted")
+      .filter(story => story.flags.some(flag => !flag.enabled))
+      .filter(story => {
+        const storiesWithSameFlag = pivotalStories
+          .filter(s => s !== story)
+          .filter(s => {
+            return s.flags.some((flag1) => {
+              return story.flags.some((flag2) => {
+                return flag1.fullName === flag2.fullName;
+              });
+            });
+          });
+
+        return storiesWithSameFlag.every(s => s.current_state === "accepted");
+      })
+  );
+
+  printListOfStories(
+    "New Features",
+    features.filter(story => story.current_state === "accepted")
+  );
+
+  printListOfStories(
+    "New Fixes",
+    bugs.filter(story => story.current_state === "accepted")
+  );
+
+  printListOfStories(
+    "Carry-over stories",
+    closedOutStories
+  );
+
+  printListOfStories(
+    "Consumer stories",
+    storiesOnRelease.filter(story => story.isConsumer)
+  );
+
+  printListOfStories(
+    "Aggregator stories",
+    storiesOnRelease.filter(story => story.isAggregator)
+  );
+
+  printListOfStories(
+    numberOfStoriesPrinted > 0 ? "Other stories" : "All stories",
+    storiesOnRelease
+      .filter(story => !story.isConsumer)
+      .filter(story => !story.isAggregator)
+  );
+
+  printListOfStories(
+    "Stories requiring code review",
+    storiesOnRelease.filter(story => story.requiresCodeReview),
+    {
+      printUpsource: true
+    }
+  );
+
+  printListOfStories(
+    "Stories requiring QA review",
+    storiesOnRelease
+      .filter(story => story.requiresQAReview)
+      .filter(story => !story.hasFeatureFlagReviews)
+  );
+
+  printListOfStories(
+    "Stories requiring design review",
+    storiesOnRelease
+      .filter(story => story.requiresDesignReview)
+      .filter(story => !story.hasFeatureFlagReviews)
+      .filter(story => !story.isAggregator)
+  );
+
+  printListOfStories(
+    "Stories requiring feature flag reviews",
+    storiesOnRelease.filter(story => story.requiresFeatureFlagReview)
+  );
+
+  console.log(`&nbsp;\n&nbsp;\n&nbsp;\n# Upsource:\n`);
+  console.log(`[Commits with open or no reviews](${getAllUnclosedReviewsUpsourceUrl(uniquePivotalIds)})`);
+  console.log(`[Commits with no attached review](${getAllUnattachedCommitsUpsourceUrl()})`);
+}
+
+getReleaseInfo().then(() => {
+  process.exit();
+});
