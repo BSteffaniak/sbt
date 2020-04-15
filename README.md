@@ -28,8 +28,8 @@ Usage: sbt <command> [options]
                          branch, but do not commit                  [aliases: wp]
    sbt test-push         Push current committed changes to a test git branch
                                                                     [aliases: tp]
-   sbt rebase-on-master  Rebase current branch onto master and fast-forward
-                         master with new commits
+   sbt rebase-on-main    Rebase the main branch and fast-forward the main 
+                         branch with new commits7
    sbt config            Configure settings for current environment and storage
  
  Options:

@@ -576,18 +576,49 @@ async function getReleaseInfo() {
   console.log(`[Commits with no attached review](${getAllUnattachedCommitsUpsourceUrl()})`);
 }
 
-function runCommand(command, options) {
+function runCommand(command, commandOptions, options) {
+  options = options || {};
+  options.throwErrorOnNonZeroExit = typeof options.throwErrorOnNonZeroExit === 'undefined' ? true : options.throwErrorOnNonZeroExit;
+  options.quiet = typeof options.quiet === 'undefined' ? false : options.quiet;
+
+  const spawnOptions = {
+    stdio: [null, process.stdout, process.stderr]
+  };
+
+  if (options.quiet) {
+    delete spawnOptions.stdio;
+  }
+
   const resp = spawnSync(
     command,
-    options,
+    commandOptions,
+    spawnOptions
+  );
+
+  if (options.throwErrorOnNonZeroExit && resp.status !== 0) {
+    throw new Error(String(resp.output));
+  }
+
+  return resp;
+}
+
+function hasUncommitedChanges() {
+  let response = runCommand(
+    'git',
+    [`update-index`, `--refresh`],
     {
-      stdio: [null, process.stdout, process.stderr]
+      throwErrorOnNonZeroExit: false,
+      quiet: true
     }
   );
 
-  if (resp.status !== 0) {
-    throw new Error(String(resp.output));
-  }
+  return runCommand(
+    'git',
+    [`diff-index`, `--quiet`, `HEAD`, `--`],
+    {
+      throwErrorOnNonZeroExit: false
+    }
+  ).status === 1;
 }
 
 async function testPush() {
@@ -607,7 +638,9 @@ async function testPush() {
 
     await storage.setItem('BRANCH_ID', branchId);
 
-    if (args.stash) {
+    const hasChanges = hasUncommitedChanges();
+
+    if (args.stash && hasChanges) {
       runCommand('git', [`add`, `.`]);
       runCommand('git', [`stash`]);
     }
@@ -617,7 +650,7 @@ async function testPush() {
     runCommand('git', [`push`]);
     runCommand('git', [`checkout`, branchName]);
 
-    if (args.stash) {
+    if (args.stash && hasChanges) {
       runCommand('git', [`stash`, `pop`]);
     }
   } catch (e) {
@@ -661,11 +694,21 @@ async function wipPush() {
 
     await storage.setItem('WIP_BRANCH_ID', branchId);
 
+    const hasChanges = hasUncommitedChanges();
+
     runCommand('git', [`checkout`, `-b`, `${prefix}${branchId}`]);
-    runCommand('git', [`add`, `.`]);
-    runCommand('git', [`commit`, `-m`, `WIP test branch progress`]);
+
+    if (hasChanges) {
+      runCommand('git', [`add`, `.`]);
+      runCommand('git', [`commit`, `-m`, `WIP test branch progress`]);
+    }
+
     runCommand('git', [`push`]);
-    runCommand('git', [`reset`, `HEAD~`]);
+
+    if (hasChanges) {
+      runCommand('git', [`reset`, `HEAD~`]);
+    }
+
     runCommand('git', [`checkout`, branchName]);
   } catch (e) {
     console.error("Failed to WIP push");
