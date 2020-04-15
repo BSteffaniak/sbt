@@ -7,12 +7,13 @@ const gitFunc = require("simple-git/promise");
 const request = require("request");
 const Rox = require("rox-node");
 
-const pivotalProjectId = sbt.pivotalProjectId;
+const pivotalProjectId = sbt.pivotal.projectId;
 const roxApiKey = sbt.roxApiKey;
 const roxAppKey = sbt.roxAppKey;
 const upsourceProjectName = sbt.upsourceProjectName;
-const pivotalTrackerToken = sbt.pivotalTrackerToken;
-const repoPath = sbt.repoPath;
+const pivotalTrackerToken = sbt.pivotal.trackerToken;
+const repoPath = sbt.repoPath || ".";
+const branchName = sbt.branchName || "master";
 
 const git = gitFunc(repoPath);
 
@@ -116,15 +117,15 @@ function getFeatureFlagData(story) {
 }
 
 function getAllUnclosedReviewsUpsourceUrl(pivotalIds) {
-  return getUpsourceUrl(`branch: development and not #{closed review} and (${pivotalIds.join(" or ")})`);
+  return getUpsourceUrl(`branch: ${branchName} and not #{closed review} and (${pivotalIds.join(" or ")})`);
 }
 
 function getAllUnattachedCommitsUpsourceUrl() {
-  return getUpsourceUrl(`branch: development and not #{closed review} and not #{open review}`);
+  return getUpsourceUrl(`branch: ${branchName} and not #{closed review} and not #{open review}`);
 }
 
 function getStoryReviewsUpsourceUrl(story) {
-  return getUpsourceUrl(`branch: development and ${story.id}`);
+  return getUpsourceUrl(`branch: ${branchName} and ${story.id}`);
 }
 
 function getUpsourceUrl(query) {
@@ -234,10 +235,10 @@ async function attachReviewInfoToStories(stories) {
       story.reviews = [];
     }
 
-    story.codeReviews = story.reviews.filter(review => review.review_type_id === 7604 || review.review_type_id === 4628937 || review.review_type_id === 4165914 || review.review_type_id === 618 || review.review_type_id === 342 || review.review_type_id === 5340178);
-    story.qaReviews = story.reviews.filter(review => review.review_type_id === 7602 || review.review_type_id === 4628939 || review.review_type_id === 4165912 || review.review_type_id === 616 || review.review_type_id === 340);
-    story.designReviews = story.reviews.filter(review => review.review_type_id === 7603 || review.review_type_id === 617);
-    story.featureFlagReviews = story.reviews.filter(review => review.review_type_id === 5527847 || review.review_type_id === 5675322);
+    story.codeReviews = story.reviews.filter(review => sbt.pivotal.reviewTypeIds.code.includes(review.review_type_id));
+    story.qaReviews = story.reviews.filter(review => sbt.pivotal.reviewTypeIds.qa.includes(review.review_type_id));
+    story.designReviews = story.reviews.filter(review => sbt.pivotal.reviewTypeIds.design.includes(review.review_type_id));
+    story.featureFlagReviews = story.reviews.filter(review => sbt.pivotal.reviewTypeIds.featureFlag.includes(review.review_type_id));
 
     story.requiresCodeReview = story.codeReviews.length === 0 || story.codeReviews.some(review => review.status !== "pass");
     story.requiresDesignReview = story.designReviews.some(review => review.status !== "pass");
