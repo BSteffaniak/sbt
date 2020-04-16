@@ -154,7 +154,7 @@ function getFeatureFlagData(story) {
         url: `https://app.rollout.io/app/${roxAppKey}/flags?filter=${fullFeatureFlagName}`
       };
     })
-    .filter(flagData => !/^(js|ts|png|gradle|io|kt|java|hooksPath)$/gi.test(flagData.name));
+    .filter(flagData => !/^(js|ts|png|gradle|io|kt|java|hooksPath|com)$/gi.test(flagData.name));
 }
 
 function getAllUnclosedReviewsUpsourceUrl(pivotalIds) {
