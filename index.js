@@ -68,12 +68,12 @@ async function getCommitMessages() {
 
   const pastReleases = sbt.releases.slice(0, sbt.releases.length - 1);
   const currentRelease = sbt.releases[sbt.releases.length - 1];
+  const releaseCommits = await git.log({from: currentRelease.from, to: currentRelease.to});
 
   const previousReleaseCommitLogs = await Promise.all(
     pastReleases.map(release => git.log({from: release.from, to: release.to}))
   );
 
-  const releaseCommits = await git.log({from: currentRelease.from, to: currentRelease.to});
   const lastRelease = previousReleaseCommitLogs[previousReleaseCommitLogs.length - 1];
   const currentCommit = releaseCommits.all[releaseCommits.total - 1];
 
@@ -658,6 +658,110 @@ function hasUncommitedChanges(cwd) {
   ).status === 1;
 }
 
+function waitForYnResponse(message) {
+  let answer;
+
+  do {
+    answer = readlineSync.question(`${message} `).trim().toLowerCase();
+  } while (answer !== 'y' && answer !== 'n');
+
+  return answer === 'y';
+}
+
+function checkAndAskToCreateRepo() {
+  if (!fs.existsSync(repoPath)) {
+    const yes = waitForYnResponse(`Repo at path '${repoPath}' does not exist. Create it? (y/n)`);
+
+    if (!yes) {
+      console.log("Fine. do it yourself.");
+      process.exit(1);
+    } else {
+      let repoName;
+
+      const targetRepoPath = repoPath === '.' ? process.cwd() : repoPath;
+
+      const lastSlashIndex = targetRepoPath.lastIndexOf('/');
+
+      if (lastSlashIndex >= 0) {
+        repoName = targetRepoPath.substring(lastSlashIndex + 1, targetRepoPath.length);
+      } else {
+        repoName = targetRepoPath;
+      }
+
+      const cwd = resolve(`${repoPath}/..`);
+
+      runCommand('git', [`clone`, repoUrl, `--branch`, stagingBranchName, repoName], {cwd: cwd, quiet: true});
+    }
+  }
+}
+
+async function createRelease() {
+  try {
+    checkAndAskToCreateRepo();
+
+    git = gitFunc(repoPath);
+
+    let latestCommitHash = "HEAD";
+
+    if (sbt.releases.length > 0 && sbt.releases[sbt.releases.length - 1].to === "HEAD") {
+      latestCommitHash = sbt.releases[sbt.releases.length - 1].from;
+    } else if (sbt.releases.length > 1) {
+      latestCommitHash = sbt.releases[sbt.releases.length - 2].to;
+    }
+
+    runCommand('git', [`checkout`, branchName], {cwd: repoPath, quiet: true});
+
+    if (!args.continue && !args.dry) {
+      runCommand('git', [`pull`], {cwd: repoPath, quiet: true});
+    }
+
+    let commits = await git.log({from: latestCommitHash, to: "HEAD"});
+
+    const commitsForStory = commits.all.filter(commit => commit.message.indexOf(args.storyId) >= 0).reverse();
+
+    if (commitsForStory.length === 0) {
+      console.error(`There are no undeployed commits relating to story #${args.storyId}`);
+      process.exit(1);
+    }
+
+    if (!args.continue && !args.dry) {
+      runCommand('git', [`checkout`, stagingBranchName], {cwd: repoPath, quiet: true});
+      runCommand('git', [`pull`], {cwd: repoPath, quiet: true});
+      runCommand('git', [`checkout`, `-b`, args.releaseBranchName], {cwd: repoPath, quiet: true});
+    } else {
+      runCommand('git', [`checkout`, args.releaseBranchName], {cwd: repoPath, quiet: true});
+    }
+
+    commitsForStory.forEach((commit) => {
+      const cherryPick = runCommand('git', [`cherry-pick`, commit.hash], {cwd: repoPath, quiet: true, throwErrorOnNonZeroExit: false});
+
+      if (cherryPick.status !== 0) {
+        if (args.autoResolveConflicts) {
+          runCommand('git', [`add`, `.`], {cwd: repoPath, quiet: true});
+          runCommand('git', [`commit`, `-m`, `Merge commit for release info`], {cwd: repoPath, quiet: true});
+        } else {
+          if (!waitForYnResponse("Please resolve conflicts and then continue by pressing 'y', or 'n' to quit.")) {
+            process.exit(1);
+          }
+
+          while (hasUncommitedChanges(repoPath)) {
+            if (!waitForYnResponse("Please commit the resolved conflicts (`git add . && git cherry-pick --continue`) and then continue by pressing 'y', or 'n' to quit.")) {
+              process.exit(1);
+            }
+          }
+        }
+      }
+    });
+
+    if (args.push) {
+      runCommand('git', [`push`, `origin`, args.releaseBranchName], {cwd: repoPath, quiet: true});
+    }
+  } catch (e) {
+    console.error(`Failed to create release:`, e);
+    process.exit(1);
+  }
+}
+
 async function pullReleaseInfo() {
   if (!sbtJsonExists()) {
     console.error(`No sbt.json file present in current working directory: '${process.cwd()}'`);
@@ -669,34 +773,7 @@ async function pullReleaseInfo() {
   }
 
   try {
-    if (!fs.existsSync(repoPath)) {
-      let answer;
-
-      do {
-        answer = readlineSync.question(`Repo at path '${repoPath}' does not exist. Create it? (y/n) `).trim().toLowerCase();
-      } while (answer !== 'y' && answer !== 'n');
-
-      if (answer === 'n') {
-        console.log("Fine. do it yourself.");
-        process.exit(1);
-      } else {
-        let repoName;
-
-        const targetRepoPath = repoPath === '.' ? process.cwd() : repoPath;
-
-        const lastSlashIndex = targetRepoPath.lastIndexOf('/');
-
-        if (lastSlashIndex >= 0) {
-          repoName = targetRepoPath.substring(lastSlashIndex + 1, targetRepoPath.length);
-        } else {
-          repoName = targetRepoPath;
-        }
-
-        const cwd = resolve(`${repoPath}/..`);
-
-        runCommand('git', [`clone`, repoUrl, `--branch`, stagingBranchName, repoName], {cwd: cwd, quiet: true});
-      }
-    }
+    checkAndAskToCreateRepo();
 
     let releaseBranchName = args.releaseBranchName;
     const currentReleaseBranchName = String(runCommand('git', [`rev-parse`, `--abbrev-ref`, `HEAD`], {cwd: repoPath, quiet: true}).stdout).trim();
@@ -907,7 +984,7 @@ async function main() {
   args = yargs
     .usage('Usage: $0 <command> [options]')
     .command(
-      ['release'], 'Generate release info to stdout',
+      ['release-info'], 'Generate release info',
       () => {
         return yargs
           .option('no-duplicate-header', {
@@ -924,8 +1001,8 @@ async function main() {
             type: 'string',
             description: 'Path to git repo to pull version info from'
           })
-          .option('dry', {
-            alias: 'd',
+          .option('just-info', {
+            alias: ['dry', 'd'],
             type: 'boolean',
             description: branchName ?
               `Do not checkout release branch and merge origin/${branchName} automatically` :
@@ -949,7 +1026,40 @@ async function main() {
             type: 'boolean',
             description: `On successfully pulling release info, push the created branch`
           });
-      }, () => command = 'release'
+      }, () => command = 'release-info'
+    )
+    .command(
+      ['create-release'], 'Cherry-pick commits related to a story to a specific branch for a release',
+      () => {
+        return yargs
+          .option('release-branch-name', {
+            type: 'string',
+            description: 'What to name the branch the release will be created on'
+          })
+          .option('story-id', {
+            type: 'string',
+            description: 'What story to create a release for'
+          })
+          .option('repo-path', {
+            type: 'string',
+            description: 'Path to git repo to create release from'
+          })
+          .option('continue', {
+            alias: 'c',
+            type: 'boolean',
+            description: `Continue cherry-picking after addressing conflicts manually`
+          })
+          .option('auto-resolve-conflicts', {
+            alias: 'arc',
+            type: 'boolean',
+            description: `Automatically resolve conflicts and create a merge commit (not correctly, though)`
+          })
+          .option('push', {
+            type: 'boolean',
+            description: `On successfully creating release branch and cherry-picking commits, push the created branch`
+          })
+          .demandOption(['release-branch-name', 'story-id']);
+      }, () => command = 'create-release'
     )
     .command(
       ['wip-push', 'wp'],
@@ -1020,11 +1130,22 @@ async function main() {
     process.exit(1);
   }
 
+  if (args.storyId) {
+    args.storyId = args.storyId.trim();
+
+    while (args.storyId[0] === '#') {
+      args.storyId = args.storyId.substring(1);
+    }
+  }
+
   initializeSbtInfo();
 
   switch (command) {
-    case 'release':
+    case 'release-info':
       await pullReleaseInfo();
+      break;
+    case 'create-release':
+      await createRelease();
       break;
     case 'wip-push':
       await wipPush();
