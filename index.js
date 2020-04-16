@@ -900,6 +900,10 @@ async function main() {
 
   const yargs = require('yargs');
 
+  args = {};
+
+  initializeSbtInfo();
+
   args = yargs
     .usage('Usage: $0 <command> [options]')
     .command(
@@ -923,7 +927,9 @@ async function main() {
           .option('dry', {
             alias: 'd',
             type: 'boolean',
-            description: `Do not checkout release branch and merge origin/${branchName} automatically`
+            description: branchName ?
+              `Do not checkout release branch and merge origin/${branchName} automatically` :
+              `Do not checkout release branch and merge the main branch's origin automatically`
           })
           .option('continue', {
             alias: 'c',
@@ -963,14 +969,18 @@ async function main() {
           })
           .option(`no-pull`, {
             type: 'boolean',
-            description: `Do not pull changes from origin/${branchName} before creating test branch`
+            description: branchName ?
+              `Do not pull changes from origin/${branchName} before creating test branch` :
+              `Do not pull changes from the main branch's origin before creating test branch`
           });
       },
       () => command = 'test-push'
     )
     .command(
       [`rebase-on-main`],
-      `Rebase current branch onto the main branch (${branchName}) and fast-forward ${branchName} with new commits`,
+      branchName ?
+        `Rebase current branch onto the main branch (${branchName}) and fast-forward ${branchName} with new commits` :
+        `Rebase current branch onto the main branch and fast-forward the main branch with new commits`,
       () => {
       },
       () => command = `rebase-on-main`
