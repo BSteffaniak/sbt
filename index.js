@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+const uuid = require('uuid').v4;
+
 const storage = require('node-persist');
 const fs = require('fs');
 
@@ -581,12 +583,13 @@ function runCommand(command, commandOptions, options) {
   options.throwErrorOnNonZeroExit = typeof options.throwErrorOnNonZeroExit === 'undefined' ? true : options.throwErrorOnNonZeroExit;
   options.quiet = typeof options.quiet === 'undefined' ? false : options.quiet;
 
-  const spawnOptions = {
-    stdio: [null, process.stdout, process.stderr]
-  };
+  const spawnOptions = {};
 
-  if (options.quiet) {
-    delete spawnOptions.stdio;
+  if (!options.quiet) {
+    spawnOptions.stdio = [null, process.stdout, process.stderr];
+  }
+  if (options.cwd) {
+    spawnOptions.cwd = options.cwd;
   }
 
   const resp = spawnSync(
@@ -596,19 +599,20 @@ function runCommand(command, commandOptions, options) {
   );
 
   if (options.throwErrorOnNonZeroExit && resp.status !== 0) {
-    throw new Error(String(resp.output));
+    throw new Error(String(resp.stdout));
   }
 
   return resp;
 }
 
-function hasUncommitedChanges() {
+function hasUncommitedChanges(cwd) {
   let response = runCommand(
     'git',
     [`update-index`, `--refresh`],
     {
       throwErrorOnNonZeroExit: false,
-      quiet: true
+      quiet: true,
+      cwd: cwd
     }
   );
 
@@ -616,9 +620,74 @@ function hasUncommitedChanges() {
     'git',
     [`diff-index`, `--quiet`, `HEAD`, `--`],
     {
-      throwErrorOnNonZeroExit: false
+      throwErrorOnNonZeroExit: false,
+      cwd: cwd
     }
   ).status === 1;
+}
+
+async function pullReleaseInfo() {
+  if (args.quick) {
+    args.autoResolveConflicts = true;
+  }
+
+  try {
+    let releaseBranchName = args.releaseBranchName;
+    const currentReleaseBranchName = String(runCommand('git', [`rev-parse`, `--abbrev-ref`, `HEAD`], {cwd: repoPath, quiet: true}).stdout).trim();
+
+    if (args.continue) {
+      console.error("Cannot continue release info when on staging branch in release repo. Either checkout a release branch, or start the release info command from scratch.");
+      process.exit(1);
+    }
+
+    if (!releaseBranchName) {
+      if (args.continue || args.dry) {
+        releaseBranchName = currentReleaseBranchName;
+      } else {
+        releaseBranchName = uuid();
+      }
+    }
+
+    if (!args.continue && !args.dry) {
+      runCommand('git', [`checkout`, `staging`], {cwd: repoPath, quiet: true});
+      runCommand('git', [`pull`], {cwd: repoPath, quiet: true});
+      runCommand('git', [`checkout`, `-b`, releaseBranchName], {cwd: repoPath, quiet: true});
+
+      const merge = runCommand('git', [`merge`, `origin/${branchName}`], {cwd: repoPath, quiet: true, throwErrorOnNonZeroExit: false});
+
+      if (merge.status !== 0) {
+        if (args.autoResolveConflicts) {
+          runCommand('git', [`add`, `.`], {cwd: repoPath, quiet: true});
+          runCommand('git', [`commit`, `-m`, `Merge commit for release info`], {cwd: repoPath, quiet: true});
+        } else {
+          console.error(`Please resolve conflicts and then continue the release by running: '${args.$0} release --continue'`)
+          process.exit(1);
+        }
+      }
+    }
+
+    if (args.continue && !args.dry && args.autoResolveConflicts && hasUncommitedChanges(repoPath)) {
+      runCommand('git', [`add`, `.`], {cwd: repoPath, quiet: true});
+      runCommand('git', [`commit`, `-m`, `Merge commit for release info`], {cwd: repoPath, quiet: true});
+    }
+
+    await getReleaseInfo();
+
+    if (args.push) {
+      runCommand('git', [`push`, `origin`, releaseBranchName], {cwd: repoPath, quiet: true});
+    }
+
+    if (!args.dry) {
+      runCommand('git', [`checkout`, `staging`], {cwd: repoPath, quiet: true});
+
+      if (!args.continue) {
+        runCommand('git', [`branch`, `-D`, releaseBranchName], {cwd: repoPath, quiet: true});
+      }
+    }
+  } catch (e) {
+    console.error(`Failed to pull release info`);
+    process.exit(1);
+  }
 }
 
 async function testPush() {
@@ -778,6 +847,29 @@ async function main() {
           .option('repo-path', {
             type: 'string',
             description: 'Path to git repo to pull version info from'
+          })
+          .option('dry', {
+            alias: 'd',
+            type: 'boolean',
+            description: `Do not checkout release branch and merge origin/${branchName} automatically`
+          })
+          .option('continue', {
+            alias: 'c',
+            type: 'boolean',
+            description: `Continue pulling release info after addressing conflicts manually`
+          })
+          .option('auto-resolve-conflicts', {
+            alias: 'arc',
+            type: 'boolean',
+            description: `Automatically resolve conflicts and create a merge commit (not correctly, though)`
+          })
+          .option('quick', {
+            type: 'boolean',
+            description: `Just quickly get the most up to date release info by creating a temp branch, then deleting it`
+          })
+          .option('push', {
+            type: 'boolean',
+            description: `On successfully pulling release info, push the created branch`
           });
       }, () => command = 'release'
     )
@@ -850,7 +942,7 @@ async function main() {
 
   switch (command) {
     case 'release':
-      await getReleaseInfo();
+      await pullReleaseInfo();
       break;
     case 'wip-push':
       await wipPush();
