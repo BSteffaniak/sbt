@@ -55,6 +55,18 @@ Options:
                                      fetching info for pivotal stories  [number]
   --repo-path                        Path to git repo to pull version info from
                                                                         [string]
+  --dry, -d                          Do not checkout release branch and merge
+                                     origin/master automatically       [boolean]
+  --continue, -c                     Continue pulling release info after
+                                     addressing conflicts manually     [boolean]
+  --auto-resolve-conflicts, --arc    Automatically resolve conflicts and create
+                                     a merge commit (not correctly, though)
+                                                                       [boolean]
+  --quick                            Just quickly get the most up to date
+                                     release info by creating a temp branch,
+                                     then deleting it afterwards       [boolean]
+  --push                             On successfully pulling release info, push
+                                     the created branch                [boolean]
 ```
 ---
 

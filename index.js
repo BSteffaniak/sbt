@@ -865,7 +865,7 @@ async function main() {
           })
           .option('quick', {
             type: 'boolean',
-            description: `Just quickly get the most up to date release info by creating a temp branch, then deleting it`
+            description: `Just quickly get the most up to date release info by creating a temp branch, then deleting it afterwards`
           })
           .option('push', {
             type: 'boolean',
