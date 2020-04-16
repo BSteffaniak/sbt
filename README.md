@@ -2,7 +2,7 @@
 
 ## Local Installation
 
-1. `npm install -g .` (the dot at the end is important!)
+1. `npm install . -g`
 
 ## Upgrading versions
 
@@ -10,8 +10,8 @@
 
 If the global `sbt` executable does not update from the `git pull`, you can uninstall and reinstall to force the update:
 
-1. `npm uninstall -g .` (the dot at the end is important!)
-1. `npm install -g .` (the dot at the end is important!)
+1. `npm uninstall . -g`
+1. `npm install . -g`
 
 ## Usage
 (Run `sbt --help` after installation to see full docs)
