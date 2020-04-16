@@ -9,30 +9,24 @@ const resolve = require('path').resolve;
 
 const {spawnSync} = require('child_process');
 
-const sbtJsonPath = `${process.cwd()}/sbt.json`;
-
-if (!fs.existsSync(sbtJsonPath)) {
-  console.error(`No sbt.json file present in current working directory: '${process.cwd()}'`);
-  process.exit(1);
-}
-
-const sbt = JSON.parse(fs.readFileSync(sbtJsonPath, 'utf8'));
-
 const gitFunc = require("simple-git/promise");
 const request = require("request");
 const Rox = require("rox-node");
 
-const pivotalProjectId = sbt.pivotal.projectId;
-const roxApiKey = sbt.rox.apiKey;
-const roxAppKey = sbt.rox.appKey;
-const upsourceProjectName = sbt.upsourceProjectName;
-const pivotalTrackerToken = sbt.pivotal.trackerToken;
-const repoUrl = sbt.repoUrl;
-const branchName = sbt.branchName || "master";
-const stagingBranchName = sbt.stagingBranchName || "staging";
-const productionBranchName = sbt.productionBranchName || "production";
+const sbtJsonPath = `${process.cwd()}/sbt.json`;
 
-let repoPath = (sbt.repoPath || ".").trim();
+let sbt;
+
+let pivotalProjectId;
+let pivotalTrackerToken;
+let roxApiKey;
+let roxAppKey;
+let upsourceProjectName;
+let repoUrl;
+let repoPath;
+let branchName;
+let stagingBranchName;
+let productionBranchName;
 
 let git;
 
@@ -41,6 +35,29 @@ let previousReleaseDate = null;
 let currentReleaseDate = null;
 
 let args;
+
+function sbtJsonExists() {
+  return fs.existsSync(sbtJsonPath);
+}
+
+function initializeSbtInfo() {
+  if (sbtJsonExists()) {
+    sbt = JSON.parse(fs.readFileSync(sbtJsonPath, 'utf8'));
+  } else {
+    sbt = {};
+  }
+
+  pivotalProjectId = sbt.pivotal ? sbt.pivotal.projectId : undefined;
+  pivotalTrackerToken = sbt.pivotal ? sbt.pivotal.trackerToken : undefined;
+  roxApiKey = sbt.rox ? sbt.rox.apiKey : undefined;
+  roxAppKey = sbt.rox ? sbt.rox.appKey : undefined;
+  upsourceProjectName = sbt.upsourceProjectName;
+  repoUrl = sbt.repoUrl;
+  repoPath = (args.repoPath || sbt.repoPath || ".").trim()
+  branchName = sbt.branchName || "master";
+  stagingBranchName = sbt.stagingBranchName || "staging";
+  productionBranchName = sbt.productionBranchName || "production";
+}
 
 async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -642,6 +659,11 @@ function hasUncommitedChanges(cwd) {
 }
 
 async function pullReleaseInfo() {
+  if (!sbtJsonExists()) {
+    console.error(`No sbt.json file present in current working directory: '${process.cwd()}'`);
+    process.exit(1);
+  }
+
   if (args.quick) {
     args.autoResolveConflicts = true;
   }
@@ -764,7 +786,7 @@ async function testPush() {
 
     runCommand('git', [`checkout`, `-b`, `${prefix}${branchId}`]);
     runCommand('git', [`push`]);
-    runCommand('git', [`checkout`, branchName]);
+    runCommand('git', [`checkout`, `@{-1}`]);
 
     if (args.stash && hasChanges) {
       runCommand('git', [`stash`, `pop`]);
@@ -825,7 +847,7 @@ async function wipPush() {
       runCommand('git', [`reset`, `HEAD~`]);
     }
 
-    runCommand('git', [`checkout`, branchName]);
+    runCommand('git', [`checkout`, `@{-1}`]);
   } catch (e) {
     console.error("Failed to WIP push");
     process.exit(1);
@@ -866,7 +888,13 @@ async function config() {
 }
 
 async function main() {
-  await storage.init();
+  if (!sbtJsonExists()) {
+    await storage.init({
+      dir: resolve(`${process.env.HOME}/.node-persist`)
+    });
+  } else {
+    await storage.init();
+  }
 
   let command;
 
@@ -982,7 +1010,7 @@ async function main() {
     process.exit(1);
   }
 
-  repoPath = args["repo-path"] || repoPath;
+  initializeSbtInfo();
 
   switch (command) {
     case 'release':
