@@ -228,8 +228,6 @@ function printStoryInfo(story, options = {}) {
     } else {
       flagText = `(description missing flag)`;
     }
-  } else {
-    flagText = `(no flags)`;
   }
 
   let upsourceLink = ``;
