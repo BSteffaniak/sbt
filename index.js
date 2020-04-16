@@ -1,13 +1,22 @@
 #!/usr/bin/env node
 
 const uuid = require('uuid').v4;
+const readlineSync = require('readline-sync');
 
 const storage = require('node-persist');
 const fs = require('fs');
+const resolve = require('path').resolve;
 
 const {spawnSync} = require('child_process');
 
-const sbt = JSON.parse(fs.readFileSync(`${process.cwd()}/sbt.json`, 'utf8'));
+const sbtJsonPath = `${process.cwd()}/sbt.json`;
+
+if (!fs.existsSync(sbtJsonPath)) {
+  console.error(`No sbt.json file present in current working directory: '${process.cwd()}'`);
+  process.exit(1);
+}
+
+const sbt = JSON.parse(fs.readFileSync(sbtJsonPath, 'utf8'));
 
 const gitFunc = require("simple-git/promise");
 const request = require("request");
@@ -18,11 +27,14 @@ const roxApiKey = sbt.rox.apiKey;
 const roxAppKey = sbt.rox.appKey;
 const upsourceProjectName = sbt.upsourceProjectName;
 const pivotalTrackerToken = sbt.pivotal.trackerToken;
+const repoUrl = sbt.repoUrl;
 const branchName = sbt.branchName || "master";
+const stagingBranchName = sbt.stagingBranchName || "staging";
+const productionBranchName = sbt.productionBranchName || "production";
 
-let repoPath = sbt.repoPath || ".";
+let repoPath = (sbt.repoPath || ".").trim();
 
-const git = gitFunc(repoPath);
+let git;
 
 let numberOfStoriesPrinted = 0;
 let previousReleaseDate = null;
@@ -35,6 +47,8 @@ async function sleep(ms) {
 }
 
 async function getCommitMessages() {
+  git = gitFunc(repoPath);
+
   const pastReleases = sbt.releases.slice(0, sbt.releases.length - 1);
   const currentRelease = sbt.releases[sbt.releases.length - 1];
 
@@ -44,12 +58,13 @@ async function getCommitMessages() {
 
   const releaseCommits = await git.log({from: currentRelease.from, to: currentRelease.to});
   const lastRelease = previousReleaseCommitLogs[previousReleaseCommitLogs.length - 1];
+  const currentCommit = releaseCommits.all[releaseCommits.total - 1];
 
   let dedupedCommits = releaseCommits.all;
 
-  if (lastRelease) {
+  if (lastRelease && currentCommit) {
     previousReleaseDate = Date.parse(lastRelease.latest.date);
-    currentReleaseDate = Date.parse(releaseCommits.all[releaseCommits.total - 1].date);
+    currentReleaseDate = Date.parse(currentCommit.date);
 
     const allPreviousReleaseCommits = previousReleaseCommitLogs.flatMap(commits => commits.all);
     const allPreviousReleaseCommitsMap = {};
@@ -599,7 +614,7 @@ function runCommand(command, commandOptions, options) {
   );
 
   if (options.throwErrorOnNonZeroExit && resp.status !== 0) {
-    throw new Error(String(resp.stdout));
+    throw new Error(`Error running command '${command} ${commandOptions.map(it => `"${it}"`).join(" ")}': ` + String(resp.stderr));
   }
 
   return resp;
@@ -632,11 +647,40 @@ async function pullReleaseInfo() {
   }
 
   try {
+    if (!fs.existsSync(repoPath)) {
+      let answer;
+
+      do {
+        answer = readlineSync.question(`Repo at path '${repoPath}' does not exist. Create it? (y/n) `).trim().toLowerCase();
+      } while (answer !== 'y' && answer !== 'n');
+
+      if (answer === 'n') {
+        console.log("Fine. do it yourself.");
+        process.exit(1);
+      } else {
+        let repoName;
+
+        const targetRepoPath = repoPath === '.' ? process.cwd() : repoPath;
+
+        const lastSlashIndex = targetRepoPath.lastIndexOf('/');
+
+        if (lastSlashIndex >= 0) {
+          repoName = targetRepoPath.substring(lastSlashIndex + 1, targetRepoPath.length);
+        } else {
+          repoName = targetRepoPath;
+        }
+
+        const cwd = resolve(`${repoPath}/..`);
+
+        runCommand('git', [`clone`, repoUrl, `--branch`, stagingBranchName, repoName], {cwd: cwd, quiet: true});
+      }
+    }
+
     let releaseBranchName = args.releaseBranchName;
     const currentReleaseBranchName = String(runCommand('git', [`rev-parse`, `--abbrev-ref`, `HEAD`], {cwd: repoPath, quiet: true}).stdout).trim();
 
-    if (args.continue) {
-      console.error("Cannot continue release info when on staging branch in release repo. Either checkout a release branch, or start the release info command from scratch.");
+    if (args.continue && currentReleaseBranchName === stagingBranchName) {
+      console.error(`Cannot continue release info when on ${stagingBranchName} branch in release repo. Either checkout a release branch, or start the release info command from scratch.`);
       process.exit(1);
     }
 
@@ -649,7 +693,7 @@ async function pullReleaseInfo() {
     }
 
     if (!args.continue && !args.dry) {
-      runCommand('git', [`checkout`, `staging`], {cwd: repoPath, quiet: true});
+      runCommand('git', [`checkout`, stagingBranchName], {cwd: repoPath, quiet: true});
       runCommand('git', [`pull`], {cwd: repoPath, quiet: true});
       runCommand('git', [`checkout`, `-b`, releaseBranchName], {cwd: repoPath, quiet: true});
 
@@ -678,7 +722,7 @@ async function pullReleaseInfo() {
     }
 
     if (!args.dry) {
-      runCommand('git', [`checkout`, `staging`], {cwd: repoPath, quiet: true});
+      runCommand('git', [`checkout`, stagingBranchName], {cwd: repoPath, quiet: true});
 
       if (!args.continue) {
         runCommand('git', [`branch`, `-D`, releaseBranchName], {cwd: repoPath, quiet: true});
