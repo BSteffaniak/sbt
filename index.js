@@ -685,7 +685,7 @@ async function pullReleaseInfo() {
       }
     }
   } catch (e) {
-    console.error(`Failed to pull release info`);
+    console.error(`Failed to pull release info:`, e);
     process.exit(1);
   }
 }
