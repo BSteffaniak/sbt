@@ -23,13 +23,15 @@ _These commands must be ran from within a directory containing a sbt.json file._
 Usage: sbt <command> [options]
 
 Commands:
-  sbt release         Generate release info to stdout
+  sbt release-info    Generate release info
+  sbt create-release  Cherry-pick commits related to a story to a specific
+                      branch for a release
   sbt wip-push        Push current staged and unstaged changes to wip git
                       branch, but do not commit                    [aliases: wp]
   sbt test-push       Push current committed changes to a test git branch
                                                                    [aliases: tp]
-  sbt rebase-on-main  Rebase current branch onto the main branch and
-                      fast-forward the main branch with new commits
+  sbt rebase-on-main  Rebase current branch onto the main branch (master) and
+                      fast-forward master with new commits
   sbt config          Configure settings for current environment and storage
 
 Options:
@@ -37,14 +39,13 @@ Options:
   --version  Show version number                                       [boolean]
 
 Examples:
-  sbt release  Generate release info to stdout
-
+  sbt release-info  Generate release info to stdout
 ```
 ---
 
-#### `sbt release`
+#### `sbt release-info`
 ```
-Generate release info to stdout
+Generate release info
 
 Options:
   --help                             Show help                         [boolean]
@@ -55,7 +56,7 @@ Options:
                                      fetching info for pivotal stories  [number]
   --repo-path                        Path to git repo to pull version info from
                                                                         [string]
-  --dry, -d                          Do not checkout release branch and merge
+  --just-info, --dry, -d             Do not checkout release branch and merge
                                      origin/master automatically       [boolean]
   --continue, -c                     Continue pulling release info after
                                      addressing conflicts manually     [boolean]
@@ -67,6 +68,29 @@ Options:
                                      then deleting it afterwards       [boolean]
   --push                             On successfully pulling release info, push
                                      the created branch                [boolean]
+```
+---
+
+#### `sbt create-release`
+```
+Cherry-pick commits related to a story to a specific branch for a release
+
+Options:
+  --help                           Show help                           [boolean]
+  --version                        Show version number                 [boolean]
+  --release-branch-name            What to name the branch the release will be
+                                   created on                [string] [required]
+  --story-id                       What story to create a release for
+                                                             [string] [required]
+  --repo-path                      Path to git repo to create release from
+                                                                        [string]
+  --continue, -c                   Continue cherry-picking after addressing
+                                   conflicts manually                  [boolean]
+  --auto-resolve-conflicts, --arc  Automatically resolve conflicts and create a
+                                   merge commit (not correctly, though)[boolean]
+  --push                           On successfully creating release branch and
+                                   cherry-picking commits, push the created
+                                   branch                              [boolean]
 ```
 ---
 

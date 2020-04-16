@@ -1119,7 +1119,7 @@ async function main() {
       },
       () => command = 'config'
     )
-    .example('$0 release', 'Generate release info to stdout');
+    .example('$0 release-info', 'Generate release info to stdout');
 
   const commands = args.getCommandInstance().getCommands();
 
