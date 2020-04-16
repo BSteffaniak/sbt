@@ -16,8 +16,6 @@ If the global `sbt` executable does not update from the `git pull`, you can unin
 ## Usage
 (Run `sbt --help` after installation to see full docs)
 
-_These commands must be ran from within a directory containing a sbt.json file._
-
 #### `sbt`
 ```
 Usage: sbt <command> [options]
