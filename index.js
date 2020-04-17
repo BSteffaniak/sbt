@@ -731,6 +731,15 @@ function checkAndAskToCreateRepo() {
 }
 
 async function createRelease() {
+  if (!args.releaseBranchName) {
+    if (!args.continue) {
+      console.error(`Missing required argument: release-branch-name`);
+      process.exit(1);
+    } else {
+      args.releaseBranchName = getCurrentReleaseBranchName();
+    }
+  }
+
   try {
     checkAndAskToCreateRepo();
 
@@ -1126,8 +1135,7 @@ async function main() {
           .option('push', {
             type: 'boolean',
             description: `On successfully creating release branch and cherry-picking commits, push the created branch`
-          })
-          .demandOption(['release-branch-name']);
+          });
       }, () => command = 'create-release'
     )
     .command(
