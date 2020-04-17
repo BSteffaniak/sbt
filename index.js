@@ -763,7 +763,7 @@ async function createRelease() {
           args.commitHashes.some(hash => commit.hash.indexOf(hash) >= 0);
       })
       .filter((commit) => {
-        return args.skipStoryIds.every(id => commit.message.indexOf(id) === -1) ||
+        return args.skipStoryIds.every(id => commit.message.indexOf(id) === -1) &&
           args.skipCommitHashes.every(hash => commit.hash.indexOf(hash) === -1);
       })
       .reverse();
