@@ -66,6 +66,9 @@ async function sleep(ms) {
 async function getCommitMessages() {
   git = gitFunc(repoPath);
 
+  args.skipStoryIds = args.skipStoryIds || [];
+  args.skipCommitHashes = args.skipCommitHashes || [];
+
   const pastReleases = sbt.releases.slice(0, sbt.releases.length - 1);
   const currentRelease = sbt.releases[sbt.releases.length - 1];
   const releaseCommits = await git.log({from: currentRelease.from, to: currentRelease.to});
@@ -74,10 +77,32 @@ async function getCommitMessages() {
     pastReleases.map(release => git.log({from: release.from, to: release.to}))
   );
 
+  previousReleaseCommitLogs.forEach((log) => {
+    log.all = log.all.filter((commit) => {
+      const keep = args.skipStoryIds.every(id => commit.message.indexOf(id) === -1) &&
+        args.skipCommitHashes.every(hash => commit.hash.indexOf(hash) === -1);
+
+      if (!keep) {
+        console.log(`Skipping ${commit.hash} ${commit.message}`);
+      }
+
+      return keep;
+    });
+  });
+
   const lastRelease = previousReleaseCommitLogs[previousReleaseCommitLogs.length - 1];
   const currentCommit = releaseCommits.all[releaseCommits.total - 1];
 
-  let dedupedCommits = releaseCommits.all;
+  let dedupedCommits = releaseCommits.all.filter((commit) => {
+    const keep = args.skipStoryIds.every(id => commit.message.indexOf(id) === -1) &&
+      args.skipCommitHashes.every(hash => commit.hash.indexOf(hash) === -1);
+
+    if (!keep) {
+      console.log(`Skipping ${commit.hash} ${commit.message}`);
+    }
+
+    return keep;
+  });
 
   if (lastRelease && currentCommit) {
     previousReleaseDate = Date.parse(lastRelease.latest.date);
@@ -1024,6 +1049,14 @@ async function main() {
             alias: 'c',
             type: 'boolean',
             description: `Continue pulling release info after addressing conflicts manually`
+          })
+          .option('skip-story-ids', {
+            type: 'array',
+            description: 'What stories to exclude in the release'
+          })
+          .option('skip-commit-hashes', {
+            type: 'array',
+            description: 'What commits to exclude in the release'
           })
           .option('auto-resolve-conflicts', {
             alias: 'arc',
