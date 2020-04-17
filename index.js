@@ -623,6 +623,15 @@ async function getReleaseInfo() {
   );
 
   printListOfStories(
+    "Stories waiting to be accepted",
+    storiesOnRelease
+      .filter(story => story.current_state !== "accepted")
+      .filter(story => !story.requiresDesignReview)
+      .filter(story => !story.requiresCodeReview)
+      .filter(story => !story.requiresQAReview)
+  );
+
+  printListOfStories(
     "Stories requiring feature flag reviews",
     storiesOnRelease.filter(story => story.requiresFeatureFlagReview)
   );
