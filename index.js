@@ -715,10 +715,24 @@ async function createRelease() {
 
     let commits = await git.log({from: latestCommitHash, to: "HEAD"});
 
-    const commitsForStory = commits.all.filter(commit => commit.message.indexOf(args.storyId) >= 0).reverse();
+    args.storyIds = args.storyIds || [];
+    args.commitHashes = args.commitHashes || [];
+    args.skipStoryIds = args.skipStoryIds || [];
+    args.skipCommitHashes = args.skipCommitHashes || [];
+
+    const commitsForStory = commits.all
+      .filter((commit) => {
+        return args.storyIds.some(id => commit.message.indexOf(id) >= 0) ||
+          args.commitHashes.some(hash => commit.hash.indexOf(hash) >= 0);
+      })
+      .filter((commit) => {
+        return args.skipStoryIds.every(id => commit.message.indexOf(id) === -1) ||
+          args.skipCommitHashes.every(hash => commit.hash.indexOf(hash) === -1);
+      })
+      .reverse();
 
     if (commitsForStory.length === 0) {
-      console.error(`There are no undeployed commits relating to story #${args.storyId}`);
+      console.error(`There are no undeployed commits relating to stories #${args.storyIds}`);
       process.exit(1);
     }
 
@@ -1034,9 +1048,21 @@ async function main() {
             type: 'string',
             description: 'What to name the branch the release will be created on'
           })
-          .option('story-id', {
-            type: 'string',
-            description: 'What story to create a release for'
+          .option('story-ids', {
+            type: 'array',
+            description: 'What stories to include in the release'
+          })
+          .option('commit-hashes', {
+            type: 'array',
+            description: 'What commits to include in the release'
+          })
+          .option('skip-story-ids', {
+            type: 'array',
+            description: 'What stories to exclude in the release'
+          })
+          .option('skip-commit-hashes', {
+            type: 'array',
+            description: 'What commits to exclude in the release'
           })
           .option('repo-path', {
             type: 'string',
@@ -1056,7 +1082,7 @@ async function main() {
             type: 'boolean',
             description: `On successfully creating release branch and cherry-picking commits, push the created branch`
           })
-          .demandOption(['release-branch-name', 'story-id']);
+          .demandOption(['release-branch-name']);
       }, () => command = 'create-release'
     )
     .command(
@@ -1126,14 +1152,6 @@ async function main() {
   if (!command || (args._[0] && !commands.includes(args._[0]))) {
     console.error(`Invalid command. Run '${args.$0} --help' for help.`);
     process.exit(1);
-  }
-
-  if (args.storyId) {
-    args.storyId = args.storyId.trim();
-
-    while (args.storyId[0] === '#') {
-      args.storyId = args.storyId.substring(1);
-    }
   }
 
   initializeSbtInfo();
