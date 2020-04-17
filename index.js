@@ -689,6 +689,10 @@ function hasUncommitedChanges(cwd) {
   ).status === 1;
 }
 
+function getCurrentReleaseBranchName() {
+  return String(runCommand('git', [`rev-parse`, `--abbrev-ref`, `HEAD`], {cwd: repoPath, quiet: true}).stdout).trim();
+}
+
 function waitForYnResponse(message) {
   let answer;
 
@@ -821,7 +825,7 @@ async function pullReleaseInfo() {
     checkAndAskToCreateRepo();
 
     let releaseBranchName = args.releaseBranchName;
-    const currentReleaseBranchName = String(runCommand('git', [`rev-parse`, `--abbrev-ref`, `HEAD`], {cwd: repoPath, quiet: true}).stdout).trim();
+    const currentReleaseBranchName = getCurrentReleaseBranchName();
 
     if (args.continue && currentReleaseBranchName === stagingBranchName) {
       console.error(`Cannot continue release info when on ${stagingBranchName} branch in release repo. Either checkout a release branch, or start the release info command from scratch.`);
