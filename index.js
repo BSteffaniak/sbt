@@ -620,7 +620,6 @@ async function getReleaseInfo() {
     storiesOnRelease
       .filter(story => story.requiresDesignReview)
       .filter(story => !story.hasFeatureFlagReviews)
-      .filter(story => !story.isAggregator)
   );
 
   printListOfStories(
