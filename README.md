@@ -78,8 +78,10 @@ Options:
   --version                        Show version number                 [boolean]
   --release-branch-name            What to name the branch the release will be
                                    created on                [string] [required]
-  --story-id                       What story to create a release for
-                                                             [string] [required]
+  --story-ids                      What stories to include in the release[array]
+  --commit-hashes                  What commits to include in the release[array]
+  --skip-story-ids                 What stories to exclude in the release[array]
+  --skip-commit-hashes             What commits to exclude in the release[array]
   --repo-path                      Path to git repo to create release from
                                                                         [string]
   --continue, -c                   Continue cherry-picking after addressing
