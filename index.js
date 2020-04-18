@@ -711,26 +711,6 @@ async function getReleaseInfo() {
   console.log(`${chores.length} Chore${chores.length === 1 ? '' : 's'} (${choreEstimationSum} point${choreEstimationSum === 1 ? '' : 's'})`);
   console.log(`${bugs.length} Bug${bugs.length === 1 ? '' : 's'} (${bugEstimationSum} point${bugEstimationSum === 1 ? '' : 's'})`);
 
-  printListOfStories(
-    "Stories to have flags turned on",
-    pivotalStories
-      .filter(story => story.current_state === "accepted")
-      .filter(story => story.flags.some(flag => !flag.enabled))
-      .filter(story => {
-        const storiesWithSameFlag = pivotalStories
-          .filter(s => s !== story)
-          .filter(s => {
-            return s.flags.some((flag1) => {
-              return story.flags.some((flag2) => {
-                return flag1.fullName === flag2.fullName;
-              });
-            });
-          });
-
-        return storiesWithSameFlag.every(s => s.current_state === "accepted");
-      })
-  );
-
   if (sbt.sections) {
     sbt.sections.forEach((section) => {
       let stories = storiesOnRelease;
@@ -755,46 +735,11 @@ async function getReleaseInfo() {
 
       printListOfStories(
         section.header,
-        sectionStories
+        sectionStories,
+        section.options
       );
     });
   }
-
-  printListOfStories(
-    "Stories requiring code review",
-    storiesOnRelease.filter(story => story.requiresCodeReview),
-    {
-      printUpsource: true
-    }
-  );
-
-  printListOfStories(
-    "Stories requiring QA review",
-    storiesOnRelease
-      .filter(story => story.requiresQAReview)
-      .filter(story => !story.hasFeatureFlagReviews)
-  );
-
-  printListOfStories(
-    "Stories requiring design review",
-    storiesOnRelease
-      .filter(story => story.requiresDesignReview)
-      .filter(story => !story.hasFeatureFlagReviews)
-  );
-
-  printListOfStories(
-    "Stories waiting to be accepted",
-    storiesOnRelease
-      .filter(story => story.current_state !== "accepted")
-      .filter(story => !story.requiresDesignReview)
-      .filter(story => !story.requiresCodeReview)
-      .filter(story => !story.requiresQAReview)
-  );
-
-  printListOfStories(
-    "Stories requiring feature flag reviews",
-    storiesOnRelease.filter(story => story.requiresFeatureFlagReview)
-  );
 
   console.log(`&nbsp;\n&nbsp;\n&nbsp;\n# Upsource:\n`);
   console.log(`[Commits with open or no reviews](${getAllUnclosedReviewsUpsourceUrl(uniquePivotalIds)})`);
