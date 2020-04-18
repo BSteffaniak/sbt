@@ -561,6 +561,7 @@ async function getReleaseInfo() {
     story.isAggregator = storyIsAggregator(story);
     story.isSpike = storyIsSpike(story);
     story.isObsolete = storyIsObsolete(story);
+    story.accepted = story.current_state === "accepted";
   });
 
   pivotalStories = allPivotalStories
