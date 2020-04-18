@@ -245,7 +245,7 @@ function sortStoryFunction(a, b) {
 function printStoryInfo(story, options = {}) {
   let flagText = ``;
 
-  if (story.hasFeatureFlagReviews) {
+  if (options.printFlags !== false && story.hasFeatureFlagReviews) {
     if (story.flags.length > 0) {
       flagText = story.flags
         .map(flag => `[Flag (${flag.enabled ? 'on' : 'off'})](${flag.url})`)
