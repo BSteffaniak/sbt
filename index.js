@@ -280,8 +280,22 @@ function printListOfStories(header, stories, options = {}) {
   if (stories.length > 0) {
     stories.sort(sortStoryFunction);
 
+    let storyCount = '';
+
+    if (options.printStoryCount !== false) {
+      storyCount = ` (${stories.length} stor${stories.length !== 1 ? 'ies' : 'y'})`;
+    }
+
+    let pointCount = '';
+
+    if (options.printPointCount !== false) {
+      const count = countEstimateSum(stories);
+
+      pointCount = ` (${count} point${count !== 1 ? 's' : ''})`;
+    }
+
     console.log(`&nbsp;\n&nbsp;\n&nbsp;`);
-    console.log(`# ${header}:\n`);
+    console.log(`# ${header}${storyCount}${pointCount}:\n`);
 
     stories.forEach((story) => printStoryInfo(story, options));
   }
