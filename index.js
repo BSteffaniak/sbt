@@ -31,6 +31,7 @@ let productionBranchName;
 let git;
 
 let numberOfStoriesPrinted = 0;
+let pivotalStories;
 let previousReleaseDate = null;
 let currentReleaseDate = null;
 
@@ -426,6 +427,28 @@ async function attachRolloutInfoToStories(stories) {
 
       flag.enabled = flag.rollout.flag.isEnabled();
     });
+
+    story.flagValues = story.flags.map(flag => flag.enabled);
+
+    const storiesWithSameFlag = pivotalStories
+      .filter(s => s !== story)
+      .filter(s => {
+        return s.flags.some((flag1) => {
+          return story.flags.some((flag2) => {
+            return flag1.fullName === flag2.fullName;
+          });
+        });
+      });
+
+    story.allStoriesWithSameFlagAccepted = storiesWithSameFlag.every(s => s.current_state === "accepted");
+    story.someStoriesWithSameFlagAccepted = storiesWithSameFlag.some(s => s.current_state === "accepted");
+    story.noStoriesWithSameFlagAccepted = storiesWithSameFlag.every(s => s.current_state !== "accepted");
+
+    const storiesWithSameFlagIncludingSelf = [story, ...storiesWithSameFlag];
+
+    story.allStoriesWithSameFlagAcceptedIncludingSelf = storiesWithSameFlagIncludingSelf.every(s => s.current_state === "accepted");
+    story.someStoriesWithSameFlagAcceptedIncludingSelf = storiesWithSameFlagIncludingSelf.some(s => s.current_state === "accepted");
+    story.noStoriesWithSameFlagAcceptedIncludingSelf = storiesWithSameFlagIncludingSelf.every(s => s.current_state !== "accepted");
   });
 }
 
@@ -540,7 +563,7 @@ async function getReleaseInfo() {
     story.isObsolete = storyIsObsolete(story);
   });
 
-  const pivotalStories = allPivotalStories
+  pivotalStories = allPivotalStories
     .filter(story => !storyIsClosedOutAndCarriedOver(story))
     .filter(story => !story.isObsolete);
 
