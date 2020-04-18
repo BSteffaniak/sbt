@@ -499,12 +499,98 @@ function filterStoriesByWhereClause(stories, whereClause) {
 }
 
 function filterFuncsForWhereClause(whereClause) {
+  // [
+  //   {
+  //     "equals": {
+  //       "story_type": "feature",
+  //       "current_state": "accepted"
+  //     }
+  //   },
+  //   {
+  //     "or": [
+  //       {
+  //         "equals": {
+  //           "hasFeatureFlagReviews": false
+  //         }
+  //       },
+  //       {
+  //         "every": {
+  //           "flagValues": true
+  //         }
+  //       }
+  //     ]
+  //   }
+  // ]
+
   return whereClause.map((clause) => {
+    // "or": [
+    //   {
+    //     "equals": {
+    //       "hasFeatureFlagReviews": false
+    //     }
+    //   },
+    //   {
+    //     "every": {
+    //       "flagValues": true
+    //     }
+    //   }
+    // ]
+
+    // "equals": {
+    //   "story_type": "feature",
+    //   "current_state": "accepted"
+    // }
+
     const commands = Object.keys(clause);
+    // ["equals", "or"]
 
     return commands.map((command) => {
+      // "equals"
+
+      // "or"
+
       const currentCommand = clause[command];
+
+      // equals:
+      // {
+      //   "story_type": "feature",
+      //   "current_state": "accepted"
+      // }
+
+      // or:
+      // [
+      //   {
+      //     "equals": {
+      //       "hasFeatureFlagReviews": false
+      //     }
+      //   },
+      //   {
+      //     "every": {
+      //       "flagValues": true
+      //     }
+      //   }
+      // ]
+
+      // every:
+      // {
+      //   "flagValues": true
+      // }
+
       const properties = Object.entries(currentCommand);
+
+      // equals:
+      // [
+      //   {"story_type": "feature"},
+      //   {"current_state": "accepted"}
+      // ]
+
+      // or:
+      // N/A
+
+      // every:
+      // [
+      //   {"flagValues": true}
+      // ]
 
       switch (command) {
         case "not":
@@ -515,14 +601,50 @@ function filterFuncsForWhereClause(whereClause) {
           return (x) => properties.every(([key, value]) => {
             return value === x[key];
           });
+        case "or":
+          return (x) => currentCommand.some((value) => {
+            // {
+            //   "equals": {
+            //     "hasFeatureFlagReviews": false
+            //   }
+            // }
+
+            // {
+            //   "every": {
+            //     "flagValues": true
+            //   }
+            // }
+
+            return filterFuncsForWhereClause([value]).every(y => y(x));
+          });
+        case "some":
         case "includes":
           return (x) => properties.every(([key, value]) => {
             const data = x[key];
 
-            if (Array.isArray(data)) {
-              return data.some(d => value.includes(d));
+            if (Array.isArray(value)) {
+              if (Array.isArray(data)) {
+                return data.some(d => value.includes(d));
+              } else {
+                return value.includes(data);
+              }
             } else {
-              return value.includes(data);
+              if (Array.isArray(data)) {
+                return data.some(d => value === d);
+              } else {
+                return value === data;
+              }
+            }
+          });
+        case "every":
+          return (x) => properties.every(([key, value]) => {
+            // ["flagValues", true]
+            const data = x[key];
+
+            if (Array.isArray(data)) {
+              return data.every(d => value === d);
+            } else {
+              return value === data;
             }
           });
         default:
