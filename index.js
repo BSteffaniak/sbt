@@ -670,6 +670,7 @@ async function getReleaseInfo() {
   const storiesAcceptedAfterPreviousRelease = await getStoriesAcceptedAfterPreviousRelease();
 
   storiesAcceptedAfterPreviousRelease
+    .filter(story => !args.skipStoryIds || !args.skipStoryIds.includes(story.id))
     .filter(story => allPivotalStories.every(s => s.id !== story.id))
     .filter(story => Date.parse(story.accepted_at) >= currentReleaseDate)
     .forEach((story) => {
