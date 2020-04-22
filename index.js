@@ -1099,18 +1099,26 @@ function upgrade() {
   }
 }
 
-function checkUpdates(quietOnUpToDate) {
+function checkUpdates(quietOnUpToDate, quietOnOutOfDate) {
   if (args.b) {
     if (updatesAvailable()) {
-      console.log(true);
-    } else if (!quietOnUpToDate) {
-      console.log(false);
+      if (!quietOnOutOfDate) {
+        console.log(true);
+      }
+    } else {
+      if (!quietOnUpToDate) {
+        console.log(false);
+      }
     }
   } else {
     if (updatesAvailable()) {
-      console.log(`There are updates available. Run '${args.$0} upgrade' to install them.`);
-    } else if (!quietOnUpToDate) {
-      console.log("Already up to date");
+      if (!quietOnOutOfDate) {
+        console.log(`There are updates available. Run '${args.$0} upgrade' to install them.`);
+      }
+    } else {
+      if (!quietOnUpToDate) {
+        console.log("Already up to date");
+      }
     }
   }
 }
@@ -1420,7 +1428,7 @@ async function main() {
       await upgrade();
       break;
     case `check-updates`:
-      await checkUpdates();
+      await checkUpdates(false, true);
       break;
     case 'config':
       await config();
