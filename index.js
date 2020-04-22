@@ -1061,7 +1061,13 @@ async function rebaseOnMaster() {
   console.log(`Successfully rebased on ${branchName}`)
 }
 
+let areUpdatesAvailable;
+
 function updatesAvailable() {
+  if (typeof areUpdatesAvailable !== 'undefined') {
+    return areUpdatesAvailable;
+  }
+
   runCommand('git', [`fetch`], {cwd: __dirname, quiet: true});
 
   const localHead = getBranchHead("HEAD", __dirname);
@@ -1094,10 +1100,18 @@ function upgrade() {
 }
 
 function checkUpdates(quietOnUpToDate) {
-  if (updatesAvailable()) {
-    console.log(`There are updates available. Run '${args.$0} upgrade' to install them.`);
-  } else if (!quietOnUpToDate) {
-    console.log("Already up to date");
+  if (args.b) {
+    if (updatesAvailable()) {
+      console.log(true);
+    } else if (!quietOnUpToDate) {
+      console.log(false);
+    }
+  } else {
+    if (updatesAvailable()) {
+      console.log(`There are updates available. Run '${args.$0} upgrade' to install them.`);
+    } else if (!quietOnUpToDate) {
+      console.log("Already up to date");
+    }
   }
 }
 
@@ -1339,6 +1353,11 @@ async function main() {
       [`check-updates`],
       `Check for any updates`,
       () => {
+        return yargs
+          .option('b', {
+            type: 'boolean',
+            description: `Print a boolean response`
+          });
       },
       () => command = `check-updates`
     )
