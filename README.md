@@ -6,12 +6,7 @@
 
 ## Upgrading versions
 
-1. `git pull`
-
-If the global `sbt` executable does not update from the `git pull`, you can uninstall and reinstall to force the update:
-
-1. `npm uninstall . -g`
-1. `npm install . -g`
+1. `sbt upgrade`
 
 ## Usage
 (Run `sbt --help` after installation to see full docs)
