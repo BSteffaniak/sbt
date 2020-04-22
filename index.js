@@ -1314,7 +1314,7 @@ async function main() {
     )
     .command(
       [`upgrade`],
-      `Check for any updates and apply them`,
+      `Check for any updates and install them`,
       () => {
         return yargs
           .option('y', {

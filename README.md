@@ -30,6 +30,7 @@ Commands:
                                                                    [aliases: tp]
   sbt rebase-on-main  Rebase current branch onto the main branch (master) and
                       fast-forward master with new commits
+  sbt upgrade         Check for any updates and install them
   sbt config          Configure settings for current environment and storage
 
 Options:
@@ -129,6 +130,17 @@ Rebase current branch onto the main branch and fast-forward the main branch with
 Options:
   --help     Show help                                                 [boolean]
   --version  Show version number                                       [boolean]
+```
+---
+
+#### `sbt upgrade`
+```
+Check for any updates and install them
+
+Options:
+  --help     Show help                                                 [boolean]
+  --version  Show version number                                       [boolean]
+  -y         Auto respond 'yes' to any prompts                         [boolean]
 ```
 ---
 
