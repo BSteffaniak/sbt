@@ -1073,7 +1073,7 @@ function updatesAvailable() {
 
 function upgrade() {
   try {
-    if (updatesAvailable()) {
+    if (!updatesAvailable()) {
       console.log(`Already up to date`);
       process.exit(2);
     }
