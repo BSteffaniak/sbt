@@ -31,6 +31,7 @@ Commands:
   sbt rebase-on-main  Rebase current branch onto the main branch (master) and
                       fast-forward master with new commits
   sbt upgrade         Check for any updates and install them
+  sbt check-updates   Check for any updates
   sbt config          Configure settings for current environment and storage
 
 Options:
@@ -141,6 +142,16 @@ Options:
   --help     Show help                                                 [boolean]
   --version  Show version number                                       [boolean]
   -y         Auto respond 'yes' to any prompts                         [boolean]
+```
+---
+
+#### `sbt check-updates`
+```
+Check for any updates
+
+Options:
+  --help     Show help                                                 [boolean]
+  --version  Show version number                                       [boolean]
 ```
 ---
 
