@@ -147,6 +147,7 @@ Check for any updates
 Options:
   --help     Show help                                                 [boolean]
   --version  Show version number                                       [boolean]
+  -b         Print a boolean response                                  [boolean]
 ```
 ---
 
