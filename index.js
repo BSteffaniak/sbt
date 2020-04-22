@@ -1062,14 +1062,18 @@ async function rebaseOnMaster() {
   console.log(`Successfully rebased on ${branchName}`)
 }
 
-async function upgrade() {
+function updatesAvailable() {
+  runCommand('git', [`fetch`], {cwd: __dirname, quiet: true});
+
+  const localHead = getBranchHead("HEAD", __dirname);
+  const remoteHead = getBranchHead("origin/master", __dirname);
+
+  return localHead !== remoteHead;
+}
+
+function upgrade() {
   try {
-    runCommand('git', [`fetch`], {cwd: __dirname, quiet: true});
-
-    const localHead = getBranchHead("HEAD", __dirname);
-    const remoteHead = getBranchHead("origin/master", __dirname);
-
-    if (localHead === remoteHead) {
+    if (updatesAvailable()) {
       console.log(`Already up to date`);
       process.exit(2);
     }
@@ -1087,6 +1091,14 @@ async function upgrade() {
     console.error(`Failed to upgrade`);
     console.error(e);
     process.exit(1);
+  }
+}
+
+function checkUpdates(quietOnUpToDate) {
+  if (updatesAvailable()) {
+    console.log(`There are updates available. Run '${args.$0} upgrade' to install them.`);
+  } else if (!quietOnUpToDate) {
+    console.log("Already up to date");
   }
 }
 
@@ -1178,6 +1190,8 @@ async function main() {
   args = {};
 
   initializeSbtInfo();
+
+  checkUpdates(true);
 
   args = yargs
     .usage('Usage: $0 <command> [options]')
@@ -1325,6 +1339,13 @@ async function main() {
       () => command = `upgrade`
     )
     .command(
+      [`check-updates`],
+      `Check for any updates`,
+      () => {
+      },
+      () => command = `check-updates`
+    )
+    .command(
       ['config'],
       'Configure settings for current environment and storage',
       () => {
@@ -1379,6 +1400,9 @@ async function main() {
       break;
     case `upgrade`:
       await upgrade();
+      break;
+    case `check-updates`:
+      await checkUpdates();
       break;
     case 'config':
       await config();
