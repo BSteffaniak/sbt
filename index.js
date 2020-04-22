@@ -16,6 +16,7 @@ const Rox = require("rox-node");
 const sbtJsonPath = `${process.cwd()}/sbt.json`;
 
 let sbt;
+let git;
 
 let pivotalProjectId;
 let pivotalTrackerToken;
@@ -27,8 +28,6 @@ let repoPath;
 let branchName;
 let stagingBranchName;
 let productionBranchName;
-
-let git;
 
 let numberOfStoriesPrinted = 0;
 let pivotalStories;
