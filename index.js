@@ -1191,8 +1191,6 @@ async function main() {
 
   initializeSbtInfo();
 
-  checkUpdates(true);
-
   args = yargs
     .usage('Usage: $0 <command> [options]')
     .command(
@@ -1379,6 +1377,8 @@ async function main() {
     console.error(`Invalid command. Run '${args.$0} --help' for help.`);
     process.exit(1);
   }
+
+  checkUpdates(true);
 
   initializeSbtInfo();
 
