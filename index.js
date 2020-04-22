@@ -1404,7 +1404,9 @@ async function main() {
     process.exit(1);
   }
 
-  checkUpdates(true);
+  if (command !== 'upgrade') {
+    checkUpdates(true);
+  }
 
   initializeSbtInfo();
 
