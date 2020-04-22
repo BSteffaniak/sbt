@@ -799,6 +799,12 @@ function getCurrentReleaseBranchName() {
   return String(runCommand('git', [`rev-parse`, `--abbrev-ref`, `HEAD`], {cwd: repoPath, quiet: true}).stdout).trim();
 }
 
+function getBranchHead(branchName, path) {
+  path = typeof path === 'undefined' ? repoPath : path;
+
+  return String(runCommand('git', [`rev-parse`, branchName], {cwd: path, quiet: true}).stdout).trim();
+}
+
 function waitForYnResponse(message) {
   let answer;
 
@@ -1056,6 +1062,34 @@ async function rebaseOnMaster() {
   console.log(`Successfully rebased on ${branchName}`)
 }
 
+async function upgrade() {
+  try {
+    runCommand('git', [`fetch`], {cwd: __dirname, quiet: true});
+
+    const localHead = getBranchHead("HEAD", __dirname);
+    const remoteHead = getBranchHead("origin/master", __dirname);
+
+    if (localHead === remoteHead) {
+      console.log(`Already up to date`);
+      process.exit(2);
+    }
+
+    if (args.y || waitForYnResponse(`Updates are available. Install them? (y/n)`)) {
+      runCommand('git', [`pull`, `--rebase`], {cwd: __dirname, quiet: true});
+      runCommand('npm', [`uninstall`, `.`, `-g`], {cwd: __dirname, quiet: true});
+      runCommand('npm', [`install`, `.`, `-g`], {cwd: __dirname, quiet: true});
+
+      console.log(`Successfully upgraded`);
+    } else {
+      console.log(`Not upgrading`);
+    }
+  } catch (e) {
+    console.error(`Failed to upgrade`);
+    console.error(e);
+    process.exit(1);
+  }
+}
+
 async function wipPush() {
   const prefix = await storage.getItem('WIP_BRANCH_NAME_PREFIX')
 
@@ -1279,6 +1313,18 @@ async function main() {
       () => command = `rebase-on-main`
     )
     .command(
+      [`upgrade`],
+      `Check for any updates and apply them`,
+      () => {
+        return yargs
+          .option('y', {
+            type: 'boolean',
+            description: `Auto respond 'yes' to any prompts`
+          });
+      },
+      () => command = `upgrade`
+    )
+    .command(
       ['config'],
       'Configure settings for current environment and storage',
       () => {
@@ -1330,6 +1376,9 @@ async function main() {
       break;
     case `rebase-on-main`:
       await rebaseOnMaster();
+      break;
+    case `upgrade`:
+      await upgrade();
       break;
     case 'config':
       await config();
