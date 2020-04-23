@@ -866,11 +866,11 @@ async function createRelease() {
 
     runCommand('git', [`checkout`, branchName], {cwd: repoPath, quiet: true});
 
-    if (!args.continue && !args.dry) {
+    if (!args.dry) {
       runCommand('git', [`pull`], {cwd: repoPath, quiet: true});
     }
 
-    let commits = await git.log({from: latestCommitHash, to: "HEAD"});
+    const commits = await git.log({from: latestCommitHash, to: "HEAD"});
 
     args.storyIds = args.storyIds || [];
     args.commitHashes = args.commitHashes || [];
@@ -901,7 +901,12 @@ async function createRelease() {
       runCommand('git', [`checkout`, args.releaseBranchName], {cwd: repoPath, quiet: true});
     }
 
-    commitsForStory.forEach((commit) => {
+    const commitsAlreadyOnBranch = await git.log({from: latestCommitHash, to: "HEAD"});
+    const commitMessagesAlreadyOnBranch = commitsAlreadyOnBranch.all.map(commit => commit.message.trim());
+
+    const commitsToIncludedThatAreNotAlreadyOnBranch = commitsForStory.filter((commit) => !commitMessagesAlreadyOnBranch.includes(commit.message.trim()));
+
+    commitsToIncludedThatAreNotAlreadyOnBranch.forEach((commit) => {
       const cherryPick = runCommand('git', [`cherry-pick`, commit.hash], {cwd: repoPath, quiet: true, throwErrorOnNonZeroExit: false});
 
       if (cherryPick.status !== 0) {
