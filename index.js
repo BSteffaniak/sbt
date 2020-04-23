@@ -867,7 +867,7 @@ async function createRelease() {
     runCommand('git', [`checkout`, branchName], {cwd: repoPath, quiet: true});
 
     if (!args.dry) {
-      runCommand('git', [`pull`], {cwd: repoPath, quiet: true});
+      runCommand('git', [`pull`, `--rebase`], {cwd: repoPath, quiet: true});
     }
 
     const commits = await git.log({from: latestCommitHash, to: "HEAD"});
@@ -895,7 +895,7 @@ async function createRelease() {
 
     if (!args.continue && !args.dry) {
       runCommand('git', [`checkout`, stagingBranchName], {cwd: repoPath, quiet: true});
-      runCommand('git', [`pull`], {cwd: repoPath, quiet: true});
+      runCommand('git', [`pull`, `--rebase`], {cwd: repoPath, quiet: true});
       runCommand('git', [`checkout`, `-b`, args.releaseBranchName], {cwd: repoPath, quiet: true});
     } else {
       runCommand('git', [`checkout`, args.releaseBranchName], {cwd: repoPath, quiet: true});
@@ -1032,7 +1032,7 @@ async function testPush() {
     }
 
     if (args.pull !== false) {
-      runCommand('git', [`pull`]);
+      runCommand('git', [`pull`, `--rebase`]);
     }
 
     runCommand('git', [`checkout`, `-b`, `${prefix}${branchId}`]);
