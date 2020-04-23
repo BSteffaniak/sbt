@@ -773,7 +773,7 @@ function runCommand(command, commandOptions, options) {
   return resp;
 }
 
-function hasUncommitedChanges(cwd) {
+function hasUncommittedChanges(cwd) {
   let response = runCommand(
     'git',
     [`update-index`, `--refresh`],
@@ -918,7 +918,7 @@ async function createRelease() {
             process.exit(1);
           }
 
-          while (hasUncommitedChanges(repoPath)) {
+          while (hasUncommittedChanges(repoPath)) {
             if (!waitForYnResponse("Please commit the resolved conflicts (`git add . && git cherry-pick --continue`) and then continue by pressing 'y', or 'n' to quit.")) {
               process.exit(1);
             }
@@ -983,7 +983,7 @@ async function pullReleaseInfo() {
       }
     }
 
-    if (args.continue && !args.dry && args.autoResolveConflicts && hasUncommitedChanges(repoPath)) {
+    if (args.continue && !args.dry && args.autoResolveConflicts && hasUncommittedChanges(repoPath)) {
       runCommand('git', [`add`, `.`], {cwd: repoPath, quiet: true});
       runCommand('git', [`commit`, `-m`, `Merge commit for release info`], {cwd: repoPath, quiet: true});
     }
@@ -1024,7 +1024,7 @@ async function testPush() {
 
     await storage.setItem('BRANCH_ID', branchId);
 
-    const hasChanges = hasUncommitedChanges();
+    const hasChanges = hasUncommittedChanges();
 
     if (args.stash && hasChanges) {
       runCommand('git', [`add`, `.`]);
@@ -1145,7 +1145,7 @@ async function wipPush() {
 
     await storage.setItem('WIP_BRANCH_ID', branchId);
 
-    const hasChanges = hasUncommitedChanges();
+    const hasChanges = hasUncommittedChanges();
 
     runCommand('git', [`checkout`, `-b`, `${prefix}${branchId}`]);
 
