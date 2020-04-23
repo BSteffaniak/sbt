@@ -994,7 +994,7 @@ async function pullReleaseInfo() {
       runCommand('git', [`push`, `origin`, releaseBranchName], {cwd: repoPath, quiet: true});
     }
 
-    if (!args.dry) {
+    if (!args.continue && !args.dry) {
       runCommand('git', [`checkout`, stagingBranchName], {cwd: repoPath, quiet: true});
 
       if (!args.continue) {
