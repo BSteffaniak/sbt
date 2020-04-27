@@ -31,6 +31,7 @@ let productionBranchName;
 
 let numberOfStoriesPrinted = 0;
 let pivotalStories;
+let projectInfo;
 let previousReleaseDate = null;
 let currentReleaseDate = null;
 
@@ -206,6 +207,43 @@ async function getStoriesAcceptedAfterPreviousRelease() {
   return await pivotalApiGetRequest(`https://www.pivotaltracker.com/services/v5/projects/${pivotalProjectId}/stories?accepted_after=${previousReleaseDate.valueOf()}`);
 }
 
+function getReviewTypesForReviewType(reviewTypeName, allReviewTypes) {
+  const reviewTypes = [];
+
+  if (sbt.pivotal.reviewTypeNames && sbt.pivotal.reviewTypeNames[reviewTypeName]) {
+    reviewTypes.push(
+      ...allReviewTypes.filter((reviewType) => {
+        return sbt.pivotal.reviewTypeNames[reviewTypeName].includes(reviewType.name);
+      })
+    );
+  }
+
+  if (sbt.pivotal.reviewTypeIds && sbt.pivotal.reviewTypeIds[reviewTypeName]) {
+    sbt.pivotal.reviewTypeIds[reviewTypeName]
+      .filter(id => reviewTypes.every(reviewType => reviewType.id !== id))
+      .forEach(id => reviewTypes.push({id}));
+  }
+
+  return reviewTypes;
+}
+
+async function getProjectInfo() {
+  const allProjects = await pivotalApiGetRequest(`https://www.pivotaltracker.com/services/v5/projects?fields=review_types`);
+
+  const allReviewTypes = allProjects.map(project => project.review_types).flat();
+
+  return {
+    codeReviewTypes: getReviewTypesForReviewType("code", allReviewTypes),
+    qaReviewTypes: getReviewTypesForReviewType("qa", allReviewTypes),
+    designReviewTypes: getReviewTypesForReviewType("design", allReviewTypes),
+    featureFlagReviewTypes: getReviewTypesForReviewType("featureFlag", allReviewTypes),
+    codeReviewTypeIds: getReviewTypesForReviewType("code", allReviewTypes).map(reviewType => reviewType.id),
+    qaReviewTypeIds: getReviewTypesForReviewType("qa", allReviewTypes).map(reviewType => reviewType.id),
+    designReviewTypeIds: getReviewTypesForReviewType("design", allReviewTypes).map(reviewType => reviewType.id),
+    featureFlagReviewTypeIds: getReviewTypesForReviewType("featureFlag", allReviewTypes).map(reviewType => reviewType.id)
+  };
+}
+
 async function pivotalApiGetRequest(url) {
   const requestOptions = {
     uri: url,
@@ -315,10 +353,10 @@ async function attachReviewInfoToStories(stories) {
       story.reviews = [];
     }
 
-    story.codeReviews = story.reviews.filter(review => sbt.pivotal.reviewTypeIds.code.includes(review.review_type_id));
-    story.qaReviews = story.reviews.filter(review => sbt.pivotal.reviewTypeIds.qa.includes(review.review_type_id));
-    story.designReviews = story.reviews.filter(review => sbt.pivotal.reviewTypeIds.design.includes(review.review_type_id));
-    story.featureFlagReviews = story.reviews.filter(review => sbt.pivotal.reviewTypeIds.featureFlag.includes(review.review_type_id));
+    story.codeReviews = story.reviews.filter(review => projectInfo.codeReviewTypeIds.includes(review.review_type_id));
+    story.qaReviews = story.reviews.filter(review => projectInfo.qaReviewTypeIds.includes(review.review_type_id));
+    story.designReviews = story.reviews.filter(review => projectInfo.designReviewTypeIds.includes(review.review_type_id));
+    story.featureFlagReviews = story.reviews.filter(review => projectInfo.featureFlagReviewTypeIds.includes(review.review_type_id));
 
     story.requiresCodeReview = story.codeReviews.length === 0 || story.codeReviews.some(review => review.status !== "pass");
     story.requiresDesignReview = story.designReviews.some(review => review.status !== "pass");
@@ -657,6 +695,7 @@ function filterFuncsForWhereClause(whereClause) {
 
 async function getReleaseInfo() {
   const uniquePivotalIds = await getUniquePivotalIds();
+  projectInfo = await getProjectInfo();
 
   const pivotalStoriesIncludingNull = await Promise.all(uniquePivotalIds.map((id) => {
     return pivotalApiGetRequest(`https://www.pivotaltracker.com/services/v5/stories/${id}`);
