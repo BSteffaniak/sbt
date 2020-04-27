@@ -666,15 +666,17 @@ async function getReleaseInfo() {
     .filter(story => story !== null)
     .filter(story => story.kind === "story");
 
-  const storiesAcceptedAfterPreviousRelease = await getStoriesAcceptedAfterPreviousRelease();
+  if (args.includePreviouslyAccepted) {
+    const storiesAcceptedAfterPreviousRelease = await getStoriesAcceptedAfterPreviousRelease();
 
-  storiesAcceptedAfterPreviousRelease
-    .filter(story => !args.skipStoryIds || !args.skipStoryIds.includes(story.id))
-    .filter(story => allPivotalStories.every(s => s.id !== story.id))
-    .filter(story => Date.parse(story.accepted_at) >= currentReleaseDate)
-    .forEach((story) => {
-      allPivotalStories.push(story);
-    });
+    storiesAcceptedAfterPreviousRelease
+      .filter(story => !args.skipStoryIds || !args.skipStoryIds.includes(story.id))
+      .filter(story => allPivotalStories.every(s => s.id !== story.id))
+      .filter(story => Date.parse(story.accepted_at) >= currentReleaseDate)
+      .forEach((story) => {
+        allPivotalStories.push(story);
+      });
+  }
 
   allPivotalStories.forEach((story) => {
     story.labelNames = story.labels.map(label => label.name);
@@ -1251,11 +1253,11 @@ async function main() {
           })
           .option('skip-story-ids', {
             type: 'array',
-            description: 'What stories to exclude in the release'
+            description: 'What stories to exclude from the release'
           })
           .option('skip-commit-hashes', {
             type: 'array',
-            description: 'What commits to exclude in the release'
+            description: 'What commits to exclude from the release'
           })
           .option('auto-resolve-conflicts', {
             alias: 'arc',
@@ -1265,6 +1267,11 @@ async function main() {
           .option('quick', {
             type: 'boolean',
             description: `Just quickly get the most up to date release info by creating a temp branch, then deleting it afterwards`
+          })
+          .option('include-previously-accepted', {
+            type: 'boolean',
+            default: false,
+            description: `Include stories that have been accepted between the previous deploy and current deploy, but have no actual code in current deploy`
           })
           .option('push', {
             type: 'boolean',
@@ -1290,11 +1297,11 @@ async function main() {
           })
           .option('skip-story-ids', {
             type: 'array',
-            description: 'What stories to exclude in the release'
+            description: 'What stories to exclude from the release'
           })
           .option('skip-commit-hashes', {
             type: 'array',
-            description: 'What commits to exclude in the release'
+            description: 'What commits to exclude from the release'
           })
           .option('repo-path', {
             type: 'string',

@@ -55,12 +55,20 @@ Options:
                                      origin/master automatically       [boolean]
   --continue, -c                     Continue pulling release info after
                                      addressing conflicts manually     [boolean]
+  --skip-story-ids                   What stories to exclude from the release
+                                                                         [array]
+  --skip-commit-hashes               What commits to exclude from the release
+                                                                         [array]
   --auto-resolve-conflicts, --arc    Automatically resolve conflicts and create
                                      a merge commit (not correctly, though)
                                                                        [boolean]
   --quick                            Just quickly get the most up to date
                                      release info by creating a temp branch,
                                      then deleting it afterwards       [boolean]
+  --include-previously-accepted      Include stories that have been accepted
+                                     between the previous deploy and current
+                                     deploy, but have no actual code in current
+                                     deploy           [boolean] [default: false]
   --push                             On successfully pulling release info, push
                                      the created branch                [boolean]
 ```
@@ -74,11 +82,13 @@ Options:
   --help                           Show help                           [boolean]
   --version                        Show version number                 [boolean]
   --release-branch-name            What to name the branch the release will be
-                                   created on                [string] [required]
+                                   created on                           [string]
   --story-ids                      What stories to include in the release[array]
   --commit-hashes                  What commits to include in the release[array]
-  --skip-story-ids                 What stories to exclude in the release[array]
-  --skip-commit-hashes             What commits to exclude in the release[array]
+  --skip-story-ids                 What stories to exclude from the release
+                                                                         [array]
+  --skip-commit-hashes             What commits to exclude from the release
+                                                                         [array]
   --repo-path                      Path to git repo to create release from
                                                                         [string]
   --continue, -c                   Continue cherry-picking after addressing
