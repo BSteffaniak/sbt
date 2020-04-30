@@ -109,6 +109,7 @@ Push current staged and unstaged changes to wip git branch, but do not commit
 Options:
   --help     Show help                                                 [boolean]
   --version  Show version number                                       [boolean]
+  --branch-name  Name the branch with a specific name                   [string]
 ```
 ---
 
@@ -118,12 +119,13 @@ Options:
 Push current committed changes to a test git branch
 
 Options:
-  --help     Show help                                                 [boolean]
-  --version  Show version number                                       [boolean]
-  --stash    Stash changes before pushing test branch, and unstash them after
-             pushing                                                   [boolean]
-  --no-pull  Do not pull changes from origin/master before creating test branch
-                                                                       [boolean]
+  --help         Show help                                             [boolean]
+  --version      Show version number                                   [boolean]
+  --stash        Stash changes before pushing test branch, and unstash them
+                 after pushing                                         [boolean]
+  --branch-name  Name the branch with a specific name                   [string]
+  --no-pull      Do not pull changes from origin/master before creating test
+                 branch                                                [boolean]
 ```
 ---
 

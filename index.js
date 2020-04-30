@@ -1056,14 +1056,18 @@ async function testPush() {
     process.exit(1);
   }
 
-  let branchId;
+  let branchName = args.branchName;
 
   try {
-    const currentBranchIdValue = parseInt(await storage.getItem('BRANCH_ID'));
+    if (!branchName) {
+      const currentBranchIdValue = parseInt(await storage.getItem('BRANCH_ID'));
 
-    branchId = (currentBranchIdValue || 0) + 1;
+      const branchId = (currentBranchIdValue || 0) + 1;
 
-    await storage.setItem('BRANCH_ID', branchId);
+      await storage.setItem('BRANCH_ID', branchId);
+
+      branchName = `${prefix}${branchId}`;
+    }
 
     const hasChanges = hasUncommittedChanges();
 
@@ -1076,7 +1080,7 @@ async function testPush() {
       runCommand('git', [`pull`, `--rebase`]);
     }
 
-    runCommand('git', [`checkout`, `-b`, `${prefix}${branchId}`]);
+    runCommand('git', [`checkout`, `-b`, branchName]);
     runCommand('git', [`push`]);
     runCommand('git', [`checkout`, `@{-1}`]);
 
@@ -1088,7 +1092,7 @@ async function testPush() {
     process.exit(1);
   }
 
-  console.log(`Successfully pushed test branch to: ${prefix}${branchId}`)
+  console.log(`Successfully pushed test branch to: branchName`)
 }
 
 async function rebaseOnMaster() {
@@ -1177,18 +1181,22 @@ async function wipPush() {
     process.exit(1);
   }
 
-  let branchId;
+  let branchName = args.branchName;
 
   try {
-    const currentBranchIdValue = parseInt(await storage.getItem('WIP_BRANCH_ID'));
+    if (!branchName) {
+      const currentBranchIdValue = parseInt(await storage.getItem('WIP_BRANCH_ID'));
 
-    branchId = (currentBranchIdValue || 0) + 1;
+      const branchId = (currentBranchIdValue || 0) + 1;
 
-    await storage.setItem('WIP_BRANCH_ID', branchId);
+      await storage.setItem('WIP_BRANCH_ID', branchId);
+
+      branchName = `${prefix}${branchId}`;
+    }
 
     const hasChanges = hasUncommittedChanges();
 
-    runCommand('git', [`checkout`, `-b`, `${prefix}${branchId}`]);
+    runCommand('git', [`checkout`, `-b`, branchName]);
 
     if (hasChanges) {
       runCommand('git', [`add`, `.`]);
@@ -1207,7 +1215,7 @@ async function wipPush() {
     process.exit(1);
   }
 
-  console.log(`Successfully pushed WIP branch to: ${prefix}${branchId}`)
+  console.log(`Successfully pushed WIP branch to: ${branchName}`)
 }
 
 async function config() {
@@ -1366,6 +1374,11 @@ async function main() {
       ['wip-push', 'wp'],
       'Push current staged and unstaged changes to wip git branch, but do not commit',
       () => {
+        return yargs
+          .option('branch-name', {
+            type: 'string',
+            description: 'Name the branch with a specific name'
+          });
       },
       () => command = 'wip-push'
     )
@@ -1377,6 +1390,10 @@ async function main() {
           .option('stash', {
             type: 'boolean',
             description: 'Stash changes before pushing test branch, and unstash them after pushing'
+          })
+          .option('branch-name', {
+            type: 'string',
+            description: 'Name the branch with a specific name'
           })
           .option(`no-pull`, {
             type: 'boolean',
