@@ -1092,7 +1092,7 @@ async function testPush() {
     process.exit(1);
   }
 
-  console.log(`Successfully pushed test branch to: branchName`)
+  console.log(`Successfully pushed test branch to: ${branchName}`)
 }
 
 async function rebaseOnMaster() {
