@@ -1083,7 +1083,7 @@ async function testPush() {
     }
 
     runCommand('git', [`checkout`, `-b`, branchName]);
-    runCommand('git', [`push`]);
+    runCommand('git', [`push`, `origin`, branchName]);
     runCommand('git', [`checkout`, `@{-1}`]);
 
     if (args.stash && hasChanges) {
@@ -1205,7 +1205,7 @@ async function wipPush() {
       runCommand('git', [`commit`, `-m`, `WIP test branch progress`]);
     }
 
-    runCommand('git', [`push`]);
+    runCommand('git', [`push`, `origin`, branchName]);
 
     if (hasChanges) {
       runCommand('git', [`reset`, `HEAD~`]);
