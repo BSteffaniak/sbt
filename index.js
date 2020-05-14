@@ -632,7 +632,9 @@ function filterFuncsForWhereClause(whereClause) {
       switch (command) {
         case "not":
           return (x) => properties.every(([key, value]) => {
-            return !filterFuncsForWhereClause(value).every(y => y(x));
+            const obj = {};
+            obj[key] = value;
+            return !filterFuncsForWhereClause([obj]).every(y => y(x));
           });
         case "equals":
           return (x) => properties.every(([key, value]) => {
