@@ -93,6 +93,8 @@ Options:
                                                                         [string]
   --continue, -c                   Continue cherry-picking after addressing
                                    conflicts manually                  [boolean]
+  --recreate                       Recreate the release branch fresh based off
+                                   of staging                          [boolean]
   --auto-resolve-conflicts, --arc  Automatically resolve conflicts and create a
                                    merge commit (not correctly, though)[boolean]
   --push                           On successfully creating release branch and

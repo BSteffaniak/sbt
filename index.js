@@ -943,6 +943,11 @@ async function createRelease() {
       }
     }
 
+    if (args.recreate) {
+      runCommand('git', [`checkout`, stagingBranchName], {cwd: repoPath, quiet: true});
+      runCommand('git', [`branch`, `-D`, args.releaseBranchName], {cwd: repoPath, quiet: true});
+    }
+
     if (!args.continue && !args.dry) {
       runCommand('git', [`checkout`, stagingBranchName], {cwd: repoPath, quiet: true});
       runCommand('git', [`pull`, `--rebase`], {cwd: repoPath, quiet: true});
@@ -1385,6 +1390,10 @@ async function main() {
             alias: 'c',
             type: 'boolean',
             description: `Continue cherry-picking after addressing conflicts manually`
+          })
+          .option('recreate', {
+            type: 'boolean',
+            description: `Recreate the release branch fresh based off of staging`
           })
           .option('auto-resolve-conflicts', {
             alias: 'arc',
