@@ -899,41 +899,48 @@ async function createRelease() {
 
     git = gitFunc(repoPath);
 
-    let latestCommitHash = "HEAD";
-
-    if (sbt.releases.length > 0 && sbt.releases[sbt.releases.length - 1].to === "HEAD") {
-      latestCommitHash = sbt.releases[sbt.releases.length - 1].from;
-    } else if (sbt.releases.length > 1) {
-      latestCommitHash = sbt.releases[sbt.releases.length - 2].to;
-    }
-
-    runCommand('git', [`checkout`, branchName], {cwd: repoPath, quiet: true});
-
-    if (!args.dry) {
-      runCommand('git', [`pull`, `--rebase`], {cwd: repoPath, quiet: true});
-    }
-
-    const commits = await git.log({from: latestCommitHash, to: "HEAD"});
-
     args.storyIds = args.storyIds || [];
     args.commitHashes = args.commitHashes || [];
     args.skipStoryIds = args.skipStoryIds || [];
     args.skipCommitHashes = args.skipCommitHashes || [];
 
-    const commitsForStory = commits.all
-      .filter((commit) => {
-        return args.storyIds.some(id => commit.message.indexOf(id) >= 0) ||
-          args.commitHashes.some(hash => commit.hash.indexOf(hash) >= 0);
-      })
-      .filter((commit) => {
-        return args.skipStoryIds.every(id => commit.message.indexOf(id) === -1) &&
-          args.skipCommitHashes.every(hash => commit.hash.indexOf(hash) === -1);
-      })
-      .reverse();
+    const cherryPickStyle = args.skipStoryIds.length > 0 ||
+      args.storyIds.length > 0 ||
+      args.commitHashes.length > 0 ||
+      args.skipCommitHashes.length > 0;
 
-    if (commitsForStory.length === 0) {
-      console.error(`There are no undeployed commits relating to stories #${args.storyIds}`);
-      process.exit(1);
+    if (cherryPickStyle) {
+      let latestCommitHash = "HEAD";
+
+      if (sbt.releases.length > 0 && sbt.releases[sbt.releases.length - 1].to === "HEAD") {
+        latestCommitHash = sbt.releases[sbt.releases.length - 1].from;
+      } else if (sbt.releases.length > 1) {
+        latestCommitHash = sbt.releases[sbt.releases.length - 2].to;
+      }
+
+      runCommand('git', [`checkout`, branchName], {cwd: repoPath, quiet: true});
+
+      if (!args.dry) {
+        runCommand('git', [`pull`, `--rebase`], {cwd: repoPath, quiet: true});
+      }
+
+      const commits = await git.log({from: latestCommitHash, to: "HEAD"});
+
+      const commitsForStory = commits.all
+        .filter((commit) => {
+          return args.storyIds.some(id => commit.message.indexOf(id) >= 0) ||
+            args.commitHashes.some(hash => commit.hash.indexOf(hash) >= 0);
+        })
+        .filter((commit) => {
+          return args.skipStoryIds.every(id => commit.message.indexOf(id) === -1) &&
+            args.skipCommitHashes.every(hash => commit.hash.indexOf(hash) === -1);
+        })
+        .reverse();
+
+      if (commitsForStory.length === 0) {
+        console.error(`There are no undeployed commits relating to stories #${args.storyIds}`);
+        process.exit(1);
+      }
     }
 
     if (!args.continue && !args.dry) {
@@ -944,15 +951,36 @@ async function createRelease() {
       runCommand('git', [`checkout`, args.releaseBranchName], {cwd: repoPath, quiet: true});
     }
 
-    const commitsAlreadyOnBranch = await git.log({from: latestCommitHash, to: "HEAD"});
-    const commitMessagesAlreadyOnBranch = commitsAlreadyOnBranch.all.map(commit => commit.message.trim());
+    if (cherryPickStyle) {
+      const commitsAlreadyOnBranch = await git.log({from: latestCommitHash, to: "HEAD"});
+      const commitMessagesAlreadyOnBranch = commitsAlreadyOnBranch.all.map(commit => commit.message.trim());
 
-    const commitsToIncludedThatAreNotAlreadyOnBranch = commitsForStory.filter((commit) => !commitMessagesAlreadyOnBranch.includes(commit.message.trim()));
+      const commitsToIncludedThatAreNotAlreadyOnBranch = commitsForStory.filter((commit) => !commitMessagesAlreadyOnBranch.includes(commit.message.trim()));
 
-    commitsToIncludedThatAreNotAlreadyOnBranch.forEach((commit) => {
-      const cherryPick = runCommand('git', [`cherry-pick`, commit.hash], {cwd: repoPath, quiet: true, throwErrorOnNonZeroExit: false});
+      commitsToIncludedThatAreNotAlreadyOnBranch.forEach((commit) => {
+        const cherryPick = runCommand('git', [`cherry-pick`, commit.hash], {cwd: repoPath, quiet: true, throwErrorOnNonZeroExit: false});
 
-      if (cherryPick.status !== 0) {
+        if (cherryPick.status !== 0) {
+          if (args.autoResolveConflicts) {
+            runCommand('git', [`add`, `.`], {cwd: repoPath, quiet: true});
+            runCommand('git', [`commit`, `-m`, `Merge commit for release info`], {cwd: repoPath, quiet: true});
+          } else {
+            if (!waitForYnResponse("Please resolve conflicts and then continue by pressing 'y', or 'n' to quit.")) {
+              process.exit(1);
+            }
+
+            while (hasUncommittedChanges(repoPath)) {
+              if (!waitForYnResponse("Please commit the resolved conflicts (`git add . && git cherry-pick --continue`) and then continue by pressing 'y', or 'n' to quit.")) {
+                process.exit(1);
+              }
+            }
+          }
+        }
+      });
+    } else {
+      const merge = runCommand('git', [`merge`, `origin/${branchName}`], {cwd: repoPath, quiet: true, throwErrorOnNonZeroExit: false});
+
+      if (merge.status !== 0) {
         if (args.autoResolveConflicts) {
           runCommand('git', [`add`, `.`], {cwd: repoPath, quiet: true});
           runCommand('git', [`commit`, `-m`, `Merge commit for release info`], {cwd: repoPath, quiet: true});
@@ -962,13 +990,13 @@ async function createRelease() {
           }
 
           while (hasUncommittedChanges(repoPath)) {
-            if (!waitForYnResponse("Please commit the resolved conflicts (`git add . && git cherry-pick --continue`) and then continue by pressing 'y', or 'n' to quit.")) {
+            if (!waitForYnResponse("Please commit the resolved conflicts (`git add . && git merge --continue`) and then continue by pressing 'y', or 'n' to quit.")) {
               process.exit(1);
             }
           }
         }
       }
-    });
+    }
 
     if (args.push) {
       runCommand('git', [`push`, `origin`, args.releaseBranchName], {cwd: repoPath, quiet: true});
