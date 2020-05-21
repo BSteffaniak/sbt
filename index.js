@@ -1029,14 +1029,14 @@ async function pullReleaseInfo() {
     }
 
     if (!releaseBranchName) {
-      if (args.continue || args.dry) {
-        releaseBranchName = currentReleaseBranchName;
-      } else {
+      if (args.quick) {
         releaseBranchName = uuid();
+      } else {
+        releaseBranchName = currentReleaseBranchName;
       }
     }
 
-    if (!args.continue && !args.dry) {
+    if (args.releaseBranchName || args.quick) {
       runCommand('git', [`checkout`, stagingBranchName], {cwd: repoPath, quiet: true});
       runCommand('git', [`pull`], {cwd: repoPath, quiet: true});
       runCommand('git', [`checkout`, `-b`, releaseBranchName], {cwd: repoPath, quiet: true});
@@ -1054,7 +1054,7 @@ async function pullReleaseInfo() {
       }
     }
 
-    if (args.continue && !args.dry && args.autoResolveConflicts && hasUncommittedChanges(repoPath)) {
+    if (args.autoResolveConflicts && hasUncommittedChanges(repoPath)) {
       runCommand('git', [`add`, `.`], {cwd: repoPath, quiet: true});
       runCommand('git', [`commit`, `-m`, `Merge commit for release info`], {cwd: repoPath, quiet: true});
     }
@@ -1065,12 +1065,9 @@ async function pullReleaseInfo() {
       runCommand('git', [`push`, `origin`, releaseBranchName], {cwd: repoPath, quiet: true});
     }
 
-    if (!args.continue && !args.dry) {
+    if (args.quick) {
       runCommand('git', [`checkout`, stagingBranchName], {cwd: repoPath, quiet: true});
-
-      if (!args.continue) {
-        runCommand('git', [`branch`, `-D`, releaseBranchName], {cwd: repoPath, quiet: true});
-      }
+      runCommand('git', [`branch`, `-D`, releaseBranchName], {cwd: repoPath, quiet: true});
     }
   } catch (e) {
     console.error(`Failed to pull release info:`, e);
