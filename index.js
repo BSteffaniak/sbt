@@ -83,7 +83,7 @@ async function getCommitMessages() {
       const keep = args.skipStoryIds.every(id => commit.message.indexOf(id) === -1) &&
         args.skipCommitHashes.every(hash => commit.hash.indexOf(hash) === -1);
 
-      if (!keep) {
+      if (!keep && args.showSkipped) {
         console.log(`Skipping ${commit.hash} ${commit.message}`);
       }
 
@@ -98,7 +98,7 @@ async function getCommitMessages() {
     const keep = args.skipStoryIds.every(id => commit.message.indexOf(id) === -1) &&
       args.skipCommitHashes.every(hash => commit.hash.indexOf(hash) === -1);
 
-    if (!keep) {
+    if (!keep && args.showSkipped) {
       console.log(`Skipping ${commit.hash} ${commit.message}`);
     }
 
@@ -128,7 +128,7 @@ async function getCommitMessages() {
       }
     });
 
-    if (duplicateCommits.length > 0 && args.dupes !== false) {
+    if (duplicateCommits.length > 0 && args.dupes !== false && args.showSkipped) {
       console.warn("Removing some duplicate commits:");
       console.warn(duplicateCommits.map(commit => commit.message).join("\n"));
       console.warn("\n\n\n\n");
@@ -1346,6 +1346,10 @@ async function main() {
           .option('quick', {
             type: 'boolean',
             description: `Just quickly get the most up to date release info by creating a temp branch, then deleting it afterwards`
+          })
+          .option('show-skipped', {
+            type: 'boolean',
+            description: `Show stories that are being skipped from being included in the release because they are from previous releases`
           })
           .option('include-previously-accepted', {
             type: 'boolean',

@@ -65,6 +65,9 @@ Options:
   --quick                            Just quickly get the most up to date
                                      release info by creating a temp branch,
                                      then deleting it afterwards       [boolean]
+  --show-skipped                     Show stories that are being skipped from
+                                     being included in the release because they
+                                     are from previous releases        [boolean]
   --include-previously-accepted      Include stories that have been accepted
                                      between the previous deploy and current
                                      deploy, but have no actual code in current
