@@ -909,9 +909,10 @@ async function createRelease() {
       args.commitHashes.length > 0 ||
       args.skipCommitHashes.length > 0;
 
-    if (cherryPickStyle) {
-      let latestCommitHash = "HEAD";
+    let latestCommitHash = "HEAD";
+    let commitsForStory;
 
+    if (cherryPickStyle) {
       if (sbt.releases.length > 0 && sbt.releases[sbt.releases.length - 1].to === "HEAD") {
         latestCommitHash = sbt.releases[sbt.releases.length - 1].from;
       } else if (sbt.releases.length > 1) {
@@ -926,7 +927,7 @@ async function createRelease() {
 
       const commits = await git.log({from: latestCommitHash, to: "HEAD"});
 
-      const commitsForStory = commits.all
+      commitsForStory = commits.all
         .filter((commit) => {
           return args.storyIds.some(id => commit.message.indexOf(id) >= 0) ||
             args.commitHashes.some(hash => commit.hash.indexOf(hash) >= 0);
