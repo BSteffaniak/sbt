@@ -1128,6 +1128,13 @@ async function testPush() {
   console.log(`Successfully pushed test branch to: ${branchName}`)
 }
 
+function stashPull() {
+  runCommand('git', [`add`, `.`]);
+  runCommand('git', [`stash`]);
+  runCommand('git', [`pull`]);
+  runCommand('git', [`stash`, `pop`]);
+}
+
 async function rebaseOnMaster() {
   try {
     runCommand('git', [`checkout`, branchName]);
@@ -1446,6 +1453,13 @@ async function main() {
       () => command = 'test-push'
     )
     .command(
+      ['stash-pull', 'sp'],
+      'Stashes changes, pulls from origin, then unstashes changes',
+      () => {
+      },
+      () => command = 'stash-pull'
+    )
+    .command(
       [`rebase-on-main`],
       branchName ?
         `Rebase current branch onto the main branch (${branchName}) and fast-forward ${branchName} with new commits` :
@@ -1531,6 +1545,9 @@ async function main() {
       break;
     case 'test-push':
       await testPush();
+      break;
+    case 'stash-pull':
+      await stashPull();
       break;
     case `rebase-on-main`:
       await rebaseOnMaster();
