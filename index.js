@@ -963,7 +963,9 @@ async function createRelease() {
 
       const commitsToIncludedThatAreNotAlreadyOnBranch = commitsForStory.filter((commit) => !commitMessagesAlreadyOnBranch.includes(commit.message.trim()));
 
-      commitsToIncludedThatAreNotAlreadyOnBranch.forEach((commit) => {
+      commitsToIncludedThatAreNotAlreadyOnBranch.forEach((commit, index, array) => {
+        console.log(`cherry-pick ${index + 1}/${array.length} ${commit.hash} ${commit.message}`)
+
         const cherryPick = runCommand('git', [`cherry-pick`, commit.hash], {cwd: repoPath, quiet: true, throwErrorOnNonZeroExit: false});
 
         if (cherryPick.status !== 0) {
