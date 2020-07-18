@@ -113,13 +113,32 @@ async function getCommitMessages() {
     const allPreviousReleaseCommitsMap = {};
 
     allPreviousReleaseCommits.forEach((commit) => {
-      allPreviousReleaseCommitsMap[commit.date + commit.message] = true;
+      if (commit.body && commit.message.toLowerCase().indexOf("revert") === -1) {
+        const messages = [...commit.body.matchAll(/((\A|\s+)\* )([\w\W]*?)/g)];
+
+        let prevIndex = 0;
+        const messagesFromBody = [];
+
+        if (messages.length > 0) {
+          messages.forEach((message) => {
+            messagesFromBody.push(commit.body.substring(prevIndex, message.index).trim().substring(2))
+
+            prevIndex = message.index;
+          });
+
+          messagesFromBody.push(commit.body.substring(prevIndex).trim().substring(2))
+        }
+
+        messagesFromBody.forEach(message => allPreviousReleaseCommitsMap[message] = true);
+      }
+
+      allPreviousReleaseCommitsMap[commit.message] = true;
     });
 
     const duplicateCommits = [];
 
     dedupedCommits = dedupedCommits.filter((commit) => {
-      if (allPreviousReleaseCommitsMap[commit.date + commit.message]) {
+      if (allPreviousReleaseCommitsMap[commit.message]) {
         duplicateCommits.push(commit);
 
         return false;
