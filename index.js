@@ -124,7 +124,15 @@ async function getCommitMessages() {
     }
   }
 
-  return dedupedCommits.map(commit => commit.message);
+  return Object.keys(getAllCommitMessages(dedupedCommits)).filter((message) => {
+    const keep = args.skipStoryIds.every(id => message.indexOf(id) === -1);
+
+    if (!keep && args.showSkipped) {
+      console.log(`Skipping ${message}`);
+    }
+
+    return keep;
+  });
 }
 
 async function getAllCommitsForReleases(releases) {
