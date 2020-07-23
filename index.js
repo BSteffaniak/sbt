@@ -148,6 +148,20 @@ async function getAllCommitsForReleases(releases) {
   return previousReleaseCommitLogs;
 }
 
+function stripCommitMessage(message) {
+  if (!message) {
+    return message;
+  }
+
+  const prId = [...message.matchAll(/ \(#\d+\)$/g)];
+
+  if (prId && prId.length === 1 && prId[0].index) {
+    message = message.substring(0, prId[0].index);
+  }
+
+  return message.trim();
+}
+
 function getAllCommitMessages(commits) {
   const allPreviousReleaseCommitsMap = {};
 
@@ -172,14 +186,14 @@ function getAllCommitMessages(commits) {
           message = message.substring(0, coauthorIndex);
         }
 
-        messagesFromBody.push(message.trim());
+        messagesFromBody.push(message);
       }
 
-      messagesFromBody.forEach(message => allPreviousReleaseCommitsMap[message] = true);
+      messagesFromBody.forEach(message => allPreviousReleaseCommitsMap[stripCommitMessage(message)] = true);
     }
 
     if (commit.message) {
-      allPreviousReleaseCommitsMap[commit.message.trim()] = true;
+      allPreviousReleaseCommitsMap[stripCommitMessage(commit.message)] = true;
     }
   });
 
