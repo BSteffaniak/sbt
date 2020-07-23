@@ -64,32 +64,25 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function getPastReleases() {
+  return sbt.releases.slice(0, sbt.releases.length - 1);
+}
+
+function getCurrentRelease() {
+  return sbt.releases[sbt.releases.length - 1];
+}
+
 async function getCommitMessages() {
   git = gitFunc(repoPath);
 
   args.skipStoryIds = args.skipStoryIds || [];
   args.skipCommitHashes = args.skipCommitHashes || [];
 
-  const pastReleases = sbt.releases.slice(0, sbt.releases.length - 1);
-  const currentRelease = sbt.releases[sbt.releases.length - 1];
+  const pastReleases = getPastReleases();
+  const currentRelease = getCurrentRelease();
   const releaseCommits = await git.log({from: currentRelease.from, to: currentRelease.to});
 
-  const previousReleaseCommitLogs = await Promise.all(
-    pastReleases.map(release => git.log({from: release.from, to: release.to}))
-  );
-
-  previousReleaseCommitLogs.forEach((log) => {
-    log.all = log.all.filter((commit) => {
-      const keep = args.skipStoryIds.every(id => commit.message.indexOf(id) === -1) &&
-        args.skipCommitHashes.every(hash => commit.hash.indexOf(hash) === -1);
-
-      if (!keep && args.showSkipped) {
-        console.log(`Skipping ${commit.hash} ${commit.message}`);
-      }
-
-      return keep;
-    });
-  });
+  const previousReleaseCommitLogs = await getAllCommitsForReleases(pastReleases);
 
   const lastRelease = previousReleaseCommitLogs[previousReleaseCommitLogs.length - 1];
   const currentCommit = releaseCommits.all[releaseCommits.total - 1];
@@ -110,30 +103,7 @@ async function getCommitMessages() {
     currentReleaseDate = Date.parse(currentCommit.date);
 
     const allPreviousReleaseCommits = previousReleaseCommitLogs.flatMap(commits => commits.all);
-    const allPreviousReleaseCommitsMap = {};
-
-    allPreviousReleaseCommits.forEach((commit) => {
-      if (commit.body && commit.message.toLowerCase().indexOf("revert") === -1) {
-        const messages = [...commit.body.matchAll(/((\A|\s+)\* )([\w\W]*?)/g)];
-
-        let prevIndex = 0;
-        const messagesFromBody = [];
-
-        if (messages.length > 0) {
-          messages.forEach((message) => {
-            messagesFromBody.push(commit.body.substring(prevIndex, message.index).trim().substring(2))
-
-            prevIndex = message.index;
-          });
-
-          messagesFromBody.push(commit.body.substring(prevIndex).trim().substring(2))
-        }
-
-        messagesFromBody.forEach(message => allPreviousReleaseCommitsMap[message] = true);
-      }
-
-      allPreviousReleaseCommitsMap[commit.message] = true;
-    });
+    const allPreviousReleaseCommitsMap = getAllCommitMessages(allPreviousReleaseCommits);
 
     const duplicateCommits = [];
 
@@ -155,6 +125,65 @@ async function getCommitMessages() {
   }
 
   return dedupedCommits.map(commit => commit.message);
+}
+
+async function getAllCommitsForReleases(releases) {
+  const previousReleaseCommitLogs = await Promise.all(
+    releases.map(release => git.log({from: release.from, to: release.to}))
+  );
+
+  previousReleaseCommitLogs.forEach((log) => {
+    log.all = log.all.filter((commit) => {
+      const keep = args.skipStoryIds.every(id => commit.message.indexOf(id) === -1) &&
+        args.skipCommitHashes.every(hash => commit.hash.indexOf(hash) === -1);
+
+      if (!keep && args.showSkipped) {
+        console.log(`Skipping ${commit.hash} ${commit.message}`);
+      }
+
+      return keep;
+    });
+  });
+
+  return previousReleaseCommitLogs;
+}
+
+function getAllCommitMessages(commits) {
+  const allPreviousReleaseCommitsMap = {};
+
+  commits.forEach((commit) => {
+    if (commit.body && commit.message.toLowerCase().indexOf("Revert \"") === -1) {
+      const messages = [...commit.body.matchAll(/((\A|\s+)\* )([\w\W]*?)/g)];
+
+      let prevIndex = 0;
+      const messagesFromBody = [];
+
+      if (messages.length > 0) {
+        messages.forEach((message) => {
+          messagesFromBody.push(commit.body.substring(prevIndex, message.index).trim().substring(2));
+
+          prevIndex = message.index;
+        });
+
+        let message = commit.body.substring(prevIndex).trim().substring(2);
+        const coauthorIndex = message.indexOf("Co-authored-by: ");
+
+        if (coauthorIndex > 0) {
+          message = message.substring(0, coauthorIndex);
+        }
+
+        messagesFromBody.push(message.trim());
+      }
+
+      messagesFromBody.forEach(message => allPreviousReleaseCommitsMap[message] = true);
+    }
+
+    if (commit.message) {
+      allPreviousReleaseCommitsMap[commit.message.trim()] = true;
+    }
+  });
+
+  return allPreviousReleaseCommitsMap;
 }
 
 async function getUniquePivotalIds() {
@@ -978,12 +1007,16 @@ async function createRelease() {
 
     if (cherryPickStyle) {
       const commitsAlreadyOnBranch = await git.log({from: latestCommitHash, to: "HEAD"});
-      const commitMessagesAlreadyOnBranch = commitsAlreadyOnBranch.all.map(commit => commit.message.trim());
 
-      const commitsToIncludedThatAreNotAlreadyOnBranch = commitsForStory.filter((commit) => !commitMessagesAlreadyOnBranch.includes(commit.message.trim()));
+      const pastCommits = await getAllCommitsForReleases(getPastReleases());
+      const commitMessagesMap = getAllCommitMessages(pastCommits.concat(commitsAlreadyOnBranch.all));
+
+      const commitsToIncludedThatAreNotAlreadyOnBranch = commitsForStory.filter((commit) => !commitMessagesMap[commit.message.trim()]);
 
       commitsToIncludedThatAreNotAlreadyOnBranch.forEach((commit, index, array) => {
-        console.log(`cherry-pick ${index + 1}/${array.length} ${commit.hash} ${commit.message}`)
+        if (!args.quiet) {
+          console.log(`cherry-pick ${index + 1}/${array.length} ${commit.hash} ${commit.message}`)
+        }
 
         const cherryPick = runCommand('git', [`cherry-pick`, commit.hash], {cwd: repoPath, quiet: true, throwErrorOnNonZeroExit: false});
 
