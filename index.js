@@ -1369,6 +1369,10 @@ async function config() {
   }
 }
 
+function renameBranch() {
+  runCommand(`git`, [`branch`, `-m`, args._[1]], {cwd: "."});
+}
+
 async function main() {
   if (!sbtJsonExists()) {
     await storage.init({
@@ -1601,6 +1605,13 @@ async function main() {
       },
       () => command = 'config'
     )
+    .command(
+      ['rename-branch'],
+      'Rename the current branch',
+      () => {
+      },
+      () => command = 'rename-branch'
+    )
     .example('$0 release-info', 'Generate release info to stdout');
 
   const commands = args.getCommandInstance().getCommands();
@@ -1645,6 +1656,9 @@ async function main() {
       break;
     case 'config':
       await config();
+      break;
+    case 'rename-branch':
+      await renameBranch();
       break;
   }
 }
