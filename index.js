@@ -124,15 +124,19 @@ async function getCommitMessages() {
     }
   }
 
-  return Object.keys(getAllCommitMessages(dedupedCommits)).filter((message) => {
-    const keep = args.skipStoryIds.every(id => message.indexOf(id) === -1);
+  if (args.includeSquash) {
+    return Object.keys(getAllCommitMessages(dedupedCommits)).filter((message) => {
+      const keep = args.skipStoryIds.every(id => message.indexOf(id) === -1);
 
-    if (!keep && args.showSkipped) {
-      console.log(`Skipping ${message}`);
-    }
+      if (!keep && args.showSkipped) {
+        console.log(`Skipping ${message}`);
+      }
 
-    return keep;
-  });
+      return keep;
+    });
+  } else {
+    return dedupedCommits.map(commit => commit.message);
+  }
 }
 
 async function getAllCommitsForReleases(releases) {
@@ -1439,6 +1443,11 @@ async function main() {
             type: 'boolean',
             default: false,
             description: `Include stories that have been accepted between the previous deploy and current deploy, but have no actual code in current deploy`
+          })
+          .option('include-squash', {
+            type: 'boolean',
+            default: true,
+            description: `Include commits from the body of squash commits`
           })
           .option('push', {
             type: 'boolean',
