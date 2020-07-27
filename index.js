@@ -958,6 +958,23 @@ function checkAndAskToCreateRepo() {
   }
 }
 
+function waitForMergeResolve() {
+  if (args.autoResolveConflicts) {
+    runCommand('git', [`add`, `.`], {cwd: repoPath, quiet: true});
+    runCommand('git', [`commit`, `-m`, `Merge commit for release info`], {cwd: repoPath, quiet: true});
+  } else {
+    if (!waitForYnResponse("Please resolve conflicts and then continue by pressing 'y', or 'n' to quit.")) {
+      process.exit(1);
+    }
+
+    while (hasUncommittedChanges(repoPath)) {
+      if (!waitForYnResponse("Please commit the resolved conflicts (`git add . && git merge --continue`) and then continue by pressing 'y', or 'n' to quit.")) {
+        process.exit(1);
+      }
+    }
+  }
+}
+
 async function createRelease() {
   if (!args.releaseBranchName) {
     if (!args.continue) {
@@ -1023,15 +1040,15 @@ async function createRelease() {
       runCommand('git', [`branch`, `-D`, args.releaseBranchName], {cwd: repoPath, quiet: true});
     }
 
-    if (!args.continue && !args.dry) {
-      runCommand('git', [`checkout`, stagingBranchName], {cwd: repoPath, quiet: true});
-      runCommand('git', [`pull`, `--rebase`], {cwd: repoPath, quiet: true});
-      runCommand('git', [`checkout`, `-b`, args.releaseBranchName], {cwd: repoPath, quiet: true});
-    } else {
-      runCommand('git', [`checkout`, args.releaseBranchName], {cwd: repoPath, quiet: true});
-    }
-
     if (cherryPickStyle) {
+      if (!args.continue && !args.dry) {
+        runCommand('git', [`checkout`, stagingBranchName], {cwd: repoPath, quiet: true});
+        runCommand('git', [`pull`, `--rebase`], {cwd: repoPath, quiet: true});
+        runCommand('git', [`checkout`, `-b`, args.releaseBranchName], {cwd: repoPath, quiet: true});
+      } else {
+        runCommand('git', [`checkout`, args.releaseBranchName], {cwd: repoPath, quiet: true});
+      }
+
       const commitsAlreadyOnBranch = await git.log({from: latestCommitHash, to: "HEAD"});
 
       const pastCommits = await getAllCommitsForReleases(getPastReleases());
@@ -1064,23 +1081,30 @@ async function createRelease() {
         }
       });
     } else {
-      const merge = runCommand('git', [`merge`, `origin/${branchName}`], {cwd: repoPath, quiet: true, throwErrorOnNonZeroExit: false});
+      const sourceBranch = `source/${args.releaseBranchName}`;
 
-      if (merge.status !== 0) {
-        if (args.autoResolveConflicts) {
-          runCommand('git', [`add`, `.`], {cwd: repoPath, quiet: true});
-          runCommand('git', [`commit`, `-m`, `Merge commit for release info`], {cwd: repoPath, quiet: true});
-        } else {
-          if (!waitForYnResponse("Please resolve conflicts and then continue by pressing 'y', or 'n' to quit.")) {
-            process.exit(1);
-          }
+      if (!args.continue && !args.dry) {
+        runCommand('git', [`checkout`, branchName], {cwd: repoPath, quiet: true});
+        runCommand('git', [`pull`, `--rebase`], {cwd: repoPath, quiet: true});
+        runCommand('git', [`checkout`, `-b`, sourceBranch], {cwd: repoPath, quiet: true});
 
-          while (hasUncommittedChanges(repoPath)) {
-            if (!waitForYnResponse("Please commit the resolved conflicts (`git add . && git merge --continue`) and then continue by pressing 'y', or 'n' to quit.")) {
-              process.exit(1);
-            }
-          }
+        const mergeStagingToMaster = runCommand('git', [`merge`, `origin/${stagingBranchName}`], {cwd: repoPath, quiet: true, throwErrorOnNonZeroExit: false});
+
+        if (mergeStagingToMaster.status !== 0) {
+          waitForMergeResolve();
         }
+
+        runCommand('git', [`checkout`, stagingBranchName], {cwd: repoPath, quiet: true});
+        runCommand('git', [`pull`, `--rebase`], {cwd: repoPath, quiet: true});
+        runCommand('git', [`checkout`, `-b`, args.releaseBranchName], {cwd: repoPath, quiet: true});
+      } else {
+        runCommand('git', [`checkout`, args.releaseBranchName], {cwd: repoPath, quiet: true});
+      }
+
+      const mergeMasterToStaging = runCommand('git', [`merge`, sourceBranch], {cwd: repoPath, quiet: true, throwErrorOnNonZeroExit: false});
+
+      if (mergeMasterToStaging.status !== 0) {
+        waitForMergeResolve();
       }
     }
 
