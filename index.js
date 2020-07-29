@@ -977,7 +977,9 @@ function waitForMergeResolve() {
 
 async function createRelease() {
   if (!args.releaseBranchName) {
-    if (!args.continue) {
+    if (args._.length === 2) {
+      args.releaseBranchName = args._[1];
+    } else if (!args.continue) {
       console.error(`Missing required argument: release-branch-name`);
       process.exit(1);
     } else {
