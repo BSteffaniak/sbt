@@ -1108,6 +1108,8 @@ async function createRelease() {
       if (mergeMasterToStaging.status !== 0) {
         waitForMergeResolve();
       }
+
+      runCommand('git', [`branch`, `-D`, sourceBranch], {cwd: repoPath, quiet: true});
     }
 
     if (args.push) {
