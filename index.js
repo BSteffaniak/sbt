@@ -270,7 +270,7 @@ function getStoryReviewsUpsourceUrl(story) {
 }
 
 function getUpsourceUrl(query) {
-  return `https://upsource.campspot.com/${upsourceProjectName}?query=${encodeURIComponent(query).replace(/\(/, "%28").replace(/\)/, "%29")}`;
+  return `https://upsource.campspot.com/${upsourceProjectName}?query=${encodeURIComponent(query).replace(/\(/, "%28").replace(/\)/, "%29")}`; // lgtm[js/incomplete-sanitization]
 }
 
 async function getStoriesAcceptedAfterPreviousRelease() {
