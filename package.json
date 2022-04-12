@@ -17,7 +17,7 @@
     "readline-sync": "^1.4.10",
     "request": "^2.88.0",
     "rox-node": "^4.8.0",
-    "simple-git": "^1.124.0",
+    "simple-git": "^3.5.0",
     "uuid": "^7.0.3",
     "yargs": "^15.3.1"
   }
